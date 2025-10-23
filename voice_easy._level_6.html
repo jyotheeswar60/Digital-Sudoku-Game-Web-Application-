@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sudoku - Voice Command</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg-color: #121212;
+        --text-color: #e1e1e1;
+        --fixed-text-color: #ffffff;
+        --user-text-color: #64b5f6;
+        --hinted-text-color: #81c784;
+        --grid-border-color: #3a3a3c;
+        --grid-thick-border-color: #9e9e9e;
+        --selected-cell-bg: #2c3e50;
+        --highlighted-cell-bg: #2c2c2e;
+        --error-cell-bg: #cf6679;
+        --button-bg: #1e1e1e;
+        --button-hover-bg: #2c2c2e;
+        --square-animation-color: rgba(255, 255, 255, 0.05);
+        --modal-bg: rgba(30, 30, 30, 0.95);
+        --text-gray-color: #9ca3af;
+      }
+      .light-mode {
+        --bg-color: #ffffff;
+        --text-color: #212121;
+        --fixed-text-color: #000000;
+        --user-text-color: #1976d2;
+        --hinted-text-color: #2e7d32;
+        --grid-border-color: #d1d1d6;
+        --grid-thick-border-color: #333333;
+        --selected-cell-bg: #bbdefb;
+        --highlighted-cell-bg: #efeff4;
+        --error-cell-bg: #e57373;
+        --button-bg: #f5f5f5;
+        --button-hover-bg: #e0e0e0;
+        --square-animation-color: rgba(0, 0, 0, 0.05);
+        --modal-bg: rgba(245, 245, 245, 0.95);
+        --text-gray-color: #6b7280;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 1rem;
+        box-sizing: border-box;
+        overflow: hidden;
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+      .squares { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: -1; }
+      .squares li { position: absolute; display: block; list-style: none; width: 20px; height: 20px; background: var(--square-animation-color); animation: animate 25s linear infinite; bottom: -150px; border-radius: 8px; }
+      @keyframes animate { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; } }
+      .squares li:nth-child(1){left:25%;width:80px;height:80px;animation-delay:0s}.squares li:nth-child(2){left:10%;width:20px;height:20px;animation-delay:2s;animation-duration:12s}.squares li:nth-child(3){left:70%;width:20px;height:20px;animation-delay:4s}.squares li:nth-child(4){left:40%;width:60px;height:60px;animation-delay:0s;animation-duration:18s}.squares li:nth-child(5){left:65%;width:20px;height:20px;animation-delay:0s}.squares li:nth-child(6){left:75%;width:110px;height:110px;animation-delay:3s}.squares li:nth-child(7){left:35%;width:150px;height:150px;animation-delay:7s}.squares li:nth-child(8){left:50%;width:25px;height:25px;animation-delay:15s;animation-duration:45s}.squares li:nth-child(9){left:20%;width:15px;height:15px;animation-delay:2s;animation-duration:35s}.squares li:nth-child(10){left:85%;width:150px;height:150px;animation-delay:0s;animation-duration:11s}
+      
+      .game-container { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+      h1 { font-size: 2.5rem; font-weight: 700; color: var(--text-color); margin-bottom: 0.5rem; text-align: center; }
+      .sudoku-grid { display: grid; grid-template-columns: repeat(9, clamp(35px, 5vw, 50px)); grid-template-rows: repeat(9, clamp(35px, 5vw, 50px)); border: 3px solid var(--grid-thick-border-color); border-radius: 8px; overflow: hidden; background-color: var(--button-bg); }
+      .sudoku-cell { position: relative; display: flex; align-items: center; justify-content: center; font-size: clamp(1.2rem, 2.5vw, 1.7rem); font-weight: 600; border: 1px solid var(--grid-border-color); cursor: pointer; transition: background-color 0.2s ease, color 0.2s ease; user-select: none; }
+      .sudoku-cell:nth-child(3n) { border-right: 2px solid var(--grid-thick-border-color); }
+      .sudoku-cell:nth-child(9n) { border-right: none; }
+      .row-border { border-bottom: 2px solid var(--grid-thick-border-color); }
+      
+      .sudoku-cell.empty-cell::before {
+        content: attr(data-label);
+        position: absolute;
+        top: 2px;
+        left: 4px;
+        font-size: 0.7rem;
+        font-weight: 400;
+        color: var(--text-gray-color);
+      }
+
+      .sudoku-cell.fixed { color: var(--fixed-text-color); cursor: default; }
+      .sudoku-cell.user-filled { color: var(--user-text-color); font-weight: 700; }
+      .sudoku-cell.selected { background-color: var(--selected-cell-bg) !important; }
+      .sudoku-cell.highlighted { background-color: var(--highlighted-cell-bg); }
+      .sudoku-cell.error-shake { animation: shake 0.5s; background-color: var(--error-cell-bg); }
+      @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+      #message-area { font-weight: bold; min-height: 48px; text-align: center; font-size: 1.2rem; order: -1; width: 100%; max-width: 500px; padding: 0.5rem; border-radius: 8px; background-color: var(--button-bg); }
+      #voice-command-button { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 0.75rem 1.5rem; font-size: 1.1rem; font-weight: 700; border-radius: 0.75rem; border: none; cursor: pointer; transition: all 0.3s ease; }
+      #voice-command-button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(99, 102, 241, 0.4); }
+      #voice-command-button.listening { background: linear-gradient(135deg, #8b5cf6, #d946ef); animation: pulse 1.5s infinite; }
+      @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+      .ui-buttons { position: fixed; top: 1rem; right: 1rem; z-index: 50; display: flex; gap: 0.5rem; }
+      .ui-button { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; border-radius: 50%; cursor: pointer; border: 1px solid var(--grid-border-color); background-color: var(--button-bg); color: var(--text-color); }
+      #back-button { position: fixed; top: 1rem; left: 1rem; z-index: 50; }
+      .hidden { display: none; }
+      
+      .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); display: grid; place-items: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+      .modal-overlay.visible { opacity: 1; pointer-events: auto; }
+      .modal-content { background-color: var(--modal-bg); backdrop-filter: blur(10px); padding: 2rem; border-radius: 16px; width: 90%; max-width: 500px; border: 1px solid var(--grid-border-color); position: relative; }
+      .modal-content h2, h3 { font-weight: 700; color: var(--text-color); margin: 0 0 1.5rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid var(--grid-thick-border-color); }
+      .modal-content h2 { font-size: 1.75rem; }
+      .modal-content h3 { font-size: 1.25rem; margin-top: 2rem; border-bottom-style: dashed; }
+      .modal-content ul { padding-left: 1.25rem; list-style-type: disc; }
+      .modal-content li { margin-bottom: 1rem; }
+      .modal-content code { background-color: var(--button-hover-bg); padding: 0.2rem 0.4rem; border-radius: 4px; font-weight: bold; }
+      .modal-content strong { display: block; font-size: 1.1rem; margin-bottom: 0.25rem; }
+      .close-modal { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 2rem; line-height: 1; cursor: pointer; color: var(--text-color); }
+
+      /* --- CONFIRMATION MODAL STYLES (Used for Back Button) --- */
+      #confirmation-modal .modal-content { padding: 1.5rem; max-width: 400px; }
+      #confirmation-modal h2 { font-size: 1.25rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--grid-border-color); }
+      #confirmation-modal p { margin-bottom: 1.5rem; line-height: 1.6; }
+      #confirmation-modal .flex { display: flex; }
+      #confirmation-modal .justify-end { justify-content: flex-end; }
+      #confirmation-modal .space-x-4 > * + * { margin-left: 1rem; }
+      #confirmation-modal button { padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 600; transition: background-color 0.2s ease; cursor:pointer; }
+      #confirm-cancel-button { border: 1px solid var(--grid-border-color); color: var(--text-color); background-color: transparent; }
+      #confirm-cancel-button:hover { background-color: var(--button-hover-bg); }
+      #confirm-ok-button { background-color: #ef4444; color: white; border: none;}
+      #confirm-ok-button:hover { background-color: #dc2626; }
+
+      /* --- CELEBRATION ANIMATION STYLES --- */
+      #celebration-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; display: none; place-items: center; overflow: hidden; }
+      #celebration-overlay.active { display: grid; }
+      #celebration-text { font-family: 'Inter', sans-serif; font-size: clamp(2.5rem, 10vw, 5rem); font-weight: 900; color: #ffcc00; text-shadow: 0 0 10px rgba(255, 165, 0, 0.8), 0 0 20px rgba(255, 69, 0, 0.6); animation: pulseScale 0.5s ease-out forwards; opacity: 0; transform: scale(0.5); z-index: 1; }
+      @keyframes pulseScale { 0% { transform: scale(0.5); opacity: 0; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+      .confetti { position: absolute; width: 10px; height: 10px; background-color: #fff; opacity: 0; border-radius: 50%; animation: confetti-fall 2.5s ease-in forwards; }
+      .star { position: absolute; font-size: 20px; color: #ffd700; opacity: 0; animation: star-burst 2.5s ease-out forwards; transform: rotate(45deg); }
+      @keyframes confetti-fall { 0% { transform: translateY(-50vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+      @keyframes star-burst { 0% { transform: scale(1) translateY(0); opacity: 1; } 100% { transform: scale(0.5) translateY(-50vh); opacity: 0; } }
+    </style>
+  </head>
+  <body>
+    <ul class="squares" aria-hidden="true"><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li></ul>
+
+    <button id="back-button" class="ui-button" aria-label="Go back" title="Go back">
+        <svg style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+    </button>
+    <div class="ui-buttons">
+      <button id="rules-button" class="ui-button" aria-label="Show rules" title="Show rules">
+        <svg style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"/></svg>
+      </button>
+      <button id="theme-toggle" class="ui-button" aria-label="Toggle theme" title="Toggle theme">
+        <svg id="sun-icon" class="hidden" style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        <svg id="moon-icon" class="hidden" style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+      </button>
+    </div>
+
+    <main>
+      <div class="game-container" role="application">
+        <h1 id="game-title">Sudoku Voice <br>
+        Easy Level 6</h1>
+        <div id="message-area" role="status" aria-live="polite">Click the button to start.</div>
+        <div id="sudoku-grid" class="sudoku-grid" aria-label="9 by 9 puzzle grid"></div>
+        <div class="controls-wrapper">
+          <button id="voice-command-button">Start Voice Command</button>
+        </div>
+      </div>
+    </main>
+
+    <div id="rules-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="close-rules-modal" class="close-modal">&times;</button>
+            <h2>How to Play with Voice</h2>
+            <ul>
+                <li><strong>Start Command:</strong> Click the "Start Voice Command" button.</li>
+                <li><strong>Select a Cell:</strong> When prompted, say the two-letter label of the cell you want to fill (e.g., say <code>A P</code> for cell AP).</li>
+                <li><strong>Place a Number:</strong> After the cell is selected, click the button again. When prompted, say the number you want to place (e.g., say <code>Five</code> or <code>9</code>).</li>
+                <li><strong>Clear a Cell:</strong> To clear a cell, select it and then say <code>Clear</code> or <code>Erase</code> when asked for a number.</li>
+            </ul>
+            <h3>Pronunciation Guide</h3>
+            <ul>
+                <li><strong>Letters:</strong> Use the NATO phonetic alphabet for clarity if needed (e.g., <code>Alpha</code>, <code>Bravo</code>, <code>Charlie</code>). The game also understands common mispronunciations (e.g., "See" for "C").</li>
+                <li><strong>Numbers:</strong> You can say the number as a word (<code>One</code>, <code>Two</code>) or as a digit (<code>1</code>, <code>2</code>). Common homophones like "To" or "For" are also recognized.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="completion-options-modal" class="modal-overlay">
+      <div class="modal-content text-center">
+        <h2 class="text-3xl font-extrabold" style="color: #4ade80; margin-bottom: 1rem;">Level Complete!</h2>
+        <p class="text-lg mb-6">Congratulations! Ready for the next challenge?</p>
+        
+        <div class="space-y-4">
+          <button id="next-level-button" style="width: 100%; padding: 0.75rem 1.5rem; border-radius: 0.75rem; background-color: #4f46e5; color: white; font-weight: bold; border: none; cursor: pointer;">
+            Next Level (Easy - 7)
+          </button>
+          <button id="back-to-levels-button" style="width: 100%; padding: 0.75rem 1.5rem; border-radius: 0.75rem; background-color: #4b5563; color: white; font-weight: bold; border: none; cursor: pointer;">
+            Back to Level Select
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="confirmation-modal" class="modal-overlay">
+      <div class="modal-content">
+        <h2 id="confirmation-title" style="color: var(--error-cell-bg);">Confirm Navigation</h2>
+        <p id="confirmation-message">Leaving will mark this level as **Dropped** and clear your progress.</p>
+        <div class="flex justify-end space-x-4">
+          <button id="confirm-cancel-button">Cancel</button>
+          <button id="confirm-ok-button" style="background-color: var(--error-cell-bg); color: white; border: none;">Leave & Drop</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="celebration-overlay">
+        <div id="celebration-text">CONGRATULATIONS!</div>
+    </div>
+
+    <script>
+      "use strict";
+
+      // --- START PROFILE STATS PLACEHOLDERS ---
+      async function fetchStatsFromServer() { console.warn("fetchStatsFromServer: Placeholder."); const d=localStorage.getItem('userStats'); return d?JSON.parse(d):{normal:{easy:{completed:0,dropped:0},medium:{completed:0,dropped:0},hard:{completed:0,dropped:0},training:{completed:0,dropped:0}},voice:{easy:{completed:0,dropped:0},medium:{completed:0,dropped:0},hard:{completed:0,dropped:0},training:{completed:0,dropped:0}}}; }
+      async function updateStatOnServer(mode, difficulty, levelIndex, status) { 
+          console.warn(`updateStatOnServer: Simulating update for ${mode} ${difficulty} L${levelIndex} -> ${status}.`);
+          try {
+            const stats = await fetchStatsFromServer();
+            stats[mode] = stats[mode] || {};
+            stats[mode][difficulty] = stats[mode][difficulty] || {completed:0,dropped:0};
+            const targetStats = stats[mode][difficulty];
+            if (status === 'completed') targetStats.completed++;
+            if (status === 'dropped') targetStats.dropped++;
+            localStorage.setItem('userStats', JSON.stringify(stats));
+          } catch (e) { /* ignore */ }
+          return true; 
+      }
+      // --- END PROFILE STATS PLACEHOLDERS ---
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const body = document.body;
+        const gridElement = document.getElementById("sudoku-grid");
+        const messageArea = document.getElementById("message-area");
+        const voiceButton = document.getElementById("voice-command-button");
+        const rulesButton = document.getElementById("rules-button");
+        const rulesModal = document.getElementById("rules-modal");
+        const closeRulesModal = document.getElementById("close-rules-modal");
+        const backButton = document.getElementById("back-button");
+        const completionModal = document.getElementById('completion-options-modal');
+        const nextLevelButton = document.getElementById('next-level-button');
+        const backToLevelsButton = document.getElementById('back-to-levels-button');
+        const confirmationModal = document.getElementById('confirmation-modal');
+        const celebrationOverlay = document.getElementById('celebration-overlay');
+        const confettiColors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+
+        // --- UI & THEME LOGIC ---
+        rulesButton.addEventListener("click", () => rulesModal.classList.add("visible"));
+        closeRulesModal.addEventListener("click", () => rulesModal.classList.remove("visible"));
+        rulesModal.addEventListener("click", (e) => { if(e.target === rulesModal) rulesModal.classList.remove("visible"); });
+        
+        const applyTheme = (theme) => {
+          localStorage.setItem('theme', theme);
+          body.classList.toggle("light-mode", theme === "light");
+          document.getElementById("sun-icon").classList.toggle("hidden", theme === "dark");
+          document.getElementById("moon-icon").classList.toggle("hidden", theme === "light");
+        };
+        document.getElementById("theme-toggle").addEventListener("click", () => applyTheme(body.classList.contains("light-mode") ? "dark" : "light"));
+        applyTheme(localStorage.getItem('theme') || (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+
+        // --- GAME STATE & CONSTANTS (UPDATED FOR LEVEL 6) ---
+        const GRID_SIZE = 9;
+        const DIFFICULTY_MODE = 'voice'; 
+        const DIFFICULTY_LEVEL = 'easy';
+        const LEVEL_INDEX = 6; // *** UPDATED LEVEL INDEX ***
+        let currentGrid = [], originalGrid = [], solutionGrid = [];
+        let selectedCell = null;
+        let labelToCellMap = {};
+        const deepCopyGrid = (g) => g.map((r) => [...r]);
+
+        // *** NEW PUZZLE AND SOLUTION FOR VOICE EASY LEVEL 6 ***
+        const fixedPuzzle = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ];
+        const fixedSolution = [
+            [9, 8, 4, 3, 2, 6, 7, 5, 1], [3, 7, 2, 5, 1, 8, 4, 6, 9], [1, 5, 6, 7, 9, 4, 3, 8, 2],
+            [5, 4, 3, 1, 8, 2, 6, 9, 7], [6, 2, 7, 9, 4, 5, 8, 1, 3], [8, 1, 9, 6, 7, 3, 5, 2, 4],
+            [4, 6, 5, 8, 3, 9, 2, 7, 4], [2, 3, 8, 4, 5, 7, 1, 3, 6], [7, 9, 1, 2, 6, 4, 8, 5, 3],
+        ];
+        
+        // --- NAVIGATION FUNCTIONS ---
+        function goToLevelSelect() { window.location.href = 'index.html'; }
+        // *** UPDATED NEXT LEVEL TARGET ***
+        function goToNextLevel() { window.location.href = `Voice_${DIFFICULTY_LEVEL.charAt(0).toUpperCase() + DIFFICULTY_LEVEL.slice(1)}_level_${LEVEL_INDEX + 1}.html`; }
+
+        // --- ANIMATION LOGIC ---
+        function runCelebration() {
+            const numParticles = 30;
+            celebrationOverlay.classList.add('active');
+            for (let i = 0; i < numParticles; i++) {
+                const particle = document.createElement('div'); const isStar = Math.random() > 0.5;
+                particle.className = isStar ? 'star' : 'confetti';
+                particle.style.left = `${Math.random() * 100}vw`;
+                particle.style.top = `${Math.random() * 100}vh`;
+                if (isStar) {
+                  particle.textContent = '⭐';
+                  particle.style.animationDuration = `${1.5 + Math.random() * 1}s`;
+                  particle.style.animationDelay = `${Math.random() * 0.5}s`;
+                } else {
+                  particle.style.backgroundColor = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+                  particle.style.width = `${5 + Math.random() * 10}px`;
+                  particle.style.height = `${5 + Math.random() * 10}px`;
+                  particle.style.animationDuration = `${1.8 + Math.random() * 0.5}s`;
+                  particle.style.animationDelay = `${Math.random() * 0.5}s`;
+                }
+                celebrationOverlay.appendChild(particle);
+                setTimeout(() => { particle.remove(); }, 2500);
+            }
+            setTimeout(() => { celebrationOverlay.classList.remove('active'); }, 2500);
+        }
+
+        // --- CONFIRMATION MODAL FUNCTION ---
+        function showConfirmationModal(message, onOk, onCancel) {
+            document.getElementById('confirmation-message').textContent = message;
+            const okOld = document.getElementById('confirm-ok-button');
+            const cancelOld = document.getElementById('confirm-cancel-button');
+            const okNew = okOld.cloneNode(true);
+            const cancelNew = cancelOld.cloneNode(true);
+            okOld.parentNode.replaceChild(okNew, okOld);
+            cancelOld.parentNode.replaceChild(cancelNew, cancelOld);
+
+            okNew.addEventListener('click', () => {
+                confirmationModal.classList.remove('visible');
+                if (onOk) onOk();
+            });
+            cancelNew.addEventListener('click', () => {
+                confirmationModal.classList.remove('visible');
+                if (onCancel) onCancel();
+            });
+            confirmationModal.classList.add('visible');
+        }
+
+        // --- CORE GAME FUNCTIONS ---
+        function newGame() {
+          originalGrid = deepCopyGrid(fixedPuzzle);
+          currentGrid = deepCopyGrid(fixedPuzzle);
+          solutionGrid = deepCopyGrid(fixedSolution);
+          renderGrid();
+          completionModal.classList.remove('visible');
+          messageArea.textContent = "Click the button to start.";
+        }
+
+        function isMoveValid(grid, row, col, num) {
+          for (let i = 0; i < GRID_SIZE; i++) { if (grid[row][i] === num || grid[i][col] === num) return false; }
+          const boxRowStart = Math.floor(row / 3) * 3, boxColStart = Math.floor(col / 3) * 3;
+          for (let r = 0; r < 3; r++) { for (let c = 0; c < 3; c++) { if (grid[boxRowStart + r][boxColStart + c] === num) return false; } }
+          return true;
+        }
+        
+        function generateLabel(index) {
+            const rowChar = String.fromCharCode(65 + Math.floor(index / 9));
+            const colChar = String.fromCharCode(65 + (index % 9));
+            return rowChar + colChar;
+        }
+
+        function renderGrid() {
+            gridElement.innerHTML = "";
+            labelToCellMap = {};
+            let emptyCellCounter = 0;
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cell = document.createElement("div");
+                    cell.className = "sudoku-cell";
+                    cell.dataset.row = r; cell.dataset.col = c;
+                    if (r === 2 || r === 5) cell.classList.add("row-border");
+                    
+                    const value = currentGrid[r][c];
+                    const originalValue = originalGrid[r][c];
+
+                    if (originalValue !== 0) {
+                        cell.textContent = originalValue;
+                        cell.classList.add("fixed");
+                    } else {
+                        if (value !== 0) {
+                            cell.textContent = value;
+                            cell.classList.add("user-filled");
+                        }
+                        const label = generateLabel(emptyCellCounter++);
+                        cell.dataset.label = label;
+                        cell.classList.add("empty-cell");
+                        cell.addEventListener("click", () => handleCellClick(cell));
+                        labelToCellMap[label] = { r, c, element: cell };
+                    }
+                    gridElement.appendChild(cell);
+                }
+            }
+        }
+
+        function handleCellClick(cell) {
+            const isSameCell = selectedCell === cell;
+            document.querySelectorAll('.selected, .highlighted').forEach(c => c.classList.remove('selected', 'highlighted'));
+            if (isSameCell) {
+                selectedCell = null;
+                return;
+            }
+            selectedCell = cell;
+            selectedCell.classList.add("selected");
+            const row = parseInt(selectedCell.dataset.row);
+            const col = parseInt(selectedCell.dataset.col);
+            for (let i = 0; i < GRID_SIZE; i++) {
+                gridElement.querySelector(`[data-row='${row}'][data-col='${i}']`)?.classList.add('highlighted');
+                gridElement.querySelector(`[data-row='${i}'][data-col='${col}']`)?.classList.add('highlighted');
+            }
+            const boxRowStart = Math.floor(row / 3) * 3;
+            const boxColStart = Math.floor(col / 3) * 3;
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    gridElement.querySelector(`[data-row='${boxRowStart + r}'][data-col='${boxColStart + c}']`)?.classList.add('highlighted');
+                }
+            }
+            selectedCell.classList.remove('highlighted');
+        }
+
+        function placeNumber(num) {
+          if (!selectedCell) return false;
+          const row = parseInt(selectedCell.dataset.row), col = parseInt(selectedCell.dataset.col);
+          const tempGrid = deepCopyGrid(currentGrid);
+          tempGrid[row][col] = 0; 
+          
+          if (!isMoveValid(tempGrid, row, col, num)) {
+            selectedCell.classList.add("error-shake");
+            setTimeout(() => selectedCell.classList.remove("error-shake"), 500);
+            return false;
+          }
+          currentGrid[row][col] = num;
+          renderGrid(); 
+          checkWinCondition();
+          return true;
+        }
+
+        function clearCell() {
+          if (!selectedCell) return;
+          const row = parseInt(selectedCell.dataset.row), col = parseInt(selectedCell.dataset.col);
+          if(originalGrid[row][col] === 0) {
+            currentGrid[row][col] = 0;
+            renderGrid(); 
+          }
+        }
+        
+        function clearSelection() {
+            if (selectedCell) {
+                document.querySelectorAll('.selected, .highlighted').forEach(c => c.classList.remove('selected', 'highlighted'));
+                selectedCell = null;
+            }
+        }
+
+        function checkWinCondition() {
+            if (currentGrid.some(row => row.includes(0))) return;
+            const isCorrect = JSON.stringify(currentGrid) === JSON.stringify(solutionGrid);
+            
+            if (isCorrect) {
+                runCelebration();
+                messageArea.textContent = "🎉 PUZZLE SOLVED! 🎉";
+                voiceButton.disabled = true;
+                clearSelection();
+                
+                updateStatOnServer(DIFFICULTY_MODE, DIFFICULTY_LEVEL, LEVEL_INDEX, 'completed');
+
+                setTimeout(() => { 
+                    nextLevelButton.textContent = `Next Level (Easy - ${LEVEL_INDEX + 1})`;
+                    completionModal.classList.add('visible'); 
+                }, 1200);
+            }
+        }
+
+        // --- VOICE COMMAND LOGIC ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            voiceButton.disabled = true;
+            voiceButton.textContent = "Voice Not Supported";
+            messageArea.textContent = "Sorry, your browser does not support voice commands.";
+        } else {
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'en-US';
+            let voiceState = 'idle';
+
+            const speak = (text, callback) => {
+                speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                if(callback) utterance.onend = callback;
+                speechSynthesis.speak(utterance);
+            };
+
+            const startListening = (state) => {
+                if (completionModal.classList.contains('visible')) return;
+                voiceState = state;
+                voiceButton.classList.add('listening');
+                voiceButton.textContent = "Listening...";
+                try {
+                    recognition.start();
+                } catch(e) {
+                    voiceButton.classList.remove('listening');
+                    voiceButton.textContent = "Start Voice Command";
+                }
+            };
+            
+            voiceButton.addEventListener('click', () => {
+                if (voiceState !== 'idle') return;
+                if (selectedCell) {
+                    speak("Say the number to place.", () => startListening('listening-for-number'));
+                } else {
+                    speak("Say the cell letters.", () => startListening('listening-for-cell'));
+                }
+            });
+            
+            const natoPhonetic = {'ALPHA':'A', 'BRAVO':'B', 'CHARLIE':'C', 'DELTA':'D', 'ECHO':'E', 'FOXTROT':'F', 'GOLF':'G', 'HOTEL':'H', 'INDIA':'I', 'JULIETT':'J', 'KILO':'K', 'LIMA':'L', 'MIKE':'M', 'NOVEMBER':'N', 'OSCAR':'O', 'PAPA':'P', 'QUEBEC':'Q', 'ROMEO':'R', 'SIERRA':'S', 'TANGO':'T', 'UNIFORM':'U', 'VICTOR':'V', 'WHISKEY':'W', 'X-RAY':'X', 'YANKEE':'Y', 'ZULU':'Z', 'SEE':'C', 'BE': 'B'};
+            const parseCellCommand = (transcript) => {
+                const cleaned = transcript.replace(/[^A-Z0-9\s]/g, '');
+                const words = cleaned.split(/\s+/);
+                
+                let letters = words.map(w => natoPhonetic[w] || (w.length === 1 ? w : null)).filter(Boolean);
+                if (letters.length >= 2) {
+                    const label = letters.slice(0, 2).join('');
+                    if (labelToCellMap[label]) return label;
+                }
+                if (labelToCellMap[cleaned]) return cleaned;
+                return null;
+            };
+
+            const parseNumberCommand = (transcript) => {
+                const numberMap = { "ONE": 1, "TWO": 2, "TO": 2, "TOO": 2, "THREE": 3, "FOUR": 4, "FOR": 4, "FIVE": 5, "SIX": 6, "SEVEN": 7, "EIGHT": 8, "NINE": 9 };
+                const words = transcript.toUpperCase().split(' ');
+                for (const word of words) {
+                    if (word === 'CLEAR' || word === 'ERASE') return 'clear';
+                    if (numberMap[word]) return numberMap[word];
+                    const num = parseInt(word);
+                    if (!isNaN(num) && num >= 1 && num <= 9) return num;
+                }
+                return null;
+            };
+            
+            recognition.onresult = (event) => {
+                let transcript = event.results[0][0].transcript.trim();
+                messageArea.textContent = `Heard: "${transcript}"`; 
+
+                if (voiceState === 'listening-for-cell') {
+                    const cellLabel = parseCellCommand(transcript.toUpperCase());
+                    if (cellLabel && labelToCellMap[cellLabel]) {
+                        handleCellClick(labelToCellMap[cellLabel].element);
+                        speak(`Cell ${cellLabel.split('').join(' ')} selected. Click the button and say a number.`);
+                    } else {
+                        speak(`Sorry, I didn't recognize that cell. Click to try again.`);
+                    }
+                } else if (voiceState === 'listening-for-number') {
+                    const command = parseNumberCommand(transcript);
+                    if (command === 'clear') {
+                        clearCell();
+                        speak("Cell cleared.", clearSelection);
+                    } else if (command !== null && command >= 1 && command <= 9) {
+                        if (placeNumber(command)) {
+                            speak(`Placed ${command}.`, clearSelection);
+                        } else {
+                            speak(`${command} is not a valid move here. Click to try again.`);
+                        }
+                    } else {
+                        speak("Please say a number from 1 to 9, or say 'clear'. Click to try again.");
+                    }
+                }
+            };
+            
+            recognition.onend = () => {
+                voiceButton.classList.remove('listening');
+                voiceButton.textContent = "Start Voice Command";
+                voiceState = 'idle'; 
+            };
+            recognition.onerror = (event) => {
+                messageArea.textContent = 'Error: ' + event.error;
+                recognition.onend();
+            };
+        }
+        
+        // --- EVENT LISTENERS ---
+        
+        backButton.addEventListener("click", () => {
+             showConfirmationModal(
+                 "Leaving will mark this level as Dropped and clear your progress.",
+                 () => { 
+                     updateStatOnServer(DIFFICULTY_MODE, DIFFICULTY_LEVEL, LEVEL_INDEX, 'dropped').then(() => {
+                         goToLevelSelect();
+                     });
+                 },
+                 () => { /* cancelled */ }
+             );
+        });
+
+        nextLevelButton.addEventListener('click', () => {
+            completionModal.classList.remove('visible');
+            goToNextLevel(); 
+        });
+        backToLevelsButton.addEventListener('click', () => {
+            completionModal.classList.remove('visible');
+            goToLevelSelect(); 
+        });
+        
+        newGame();
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Digital Sudoku</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --bg-color: #0d1117;
+        --text-color: #e6edf3;
+        --card-bg-color: rgba(18, 20, 26, 0.7);
+        --input-bg-color: rgba(255, 255, 255, 0.1);
+        --input-focus-bg: rgba(255, 255, 255, 0.15);
+        --square-animation-color: rgba(255, 255, 255, 0.05);
+        --text-gray-color: #9ca3af;
+        --grid-border-color: #4b5563;
+        --grid-thick-border-color: #9ca3af;
+        --grid-cell-bg: rgba(255, 255, 255, 0.03);
+        /* Message Colors */
+        --success-color: #4ade80; /* Tailwind green-500 */
+        --error-color: #f87171; /* Tailwind red-500 */
+        --info-color: #60a5fa; /* Tailwind blue-400 */
+      }
+
+      .light-mode {
+        --bg-color: #ffffff;
+        --text-color: #212121;
+        --fixed-text-color: #000000;
+        --user-text-color: #1976d2;
+        --hinted-text-color: #2e7d32;
+        --grid-border-color: #d1d1d6;
+        --grid-thick-border-color: #333333;
+        --selected-cell-bg: #bbdefb;
+        --highlighted-cell-bg: #efeff4;
+        --error-cell-bg: #e57373;
+        --button-bg: #f5f5f5;
+        --button-hover-bg: #e0e0e0;
+        --square-animation-color: rgba(0, 0, 0, 0.05);
+        --modal-bg: rgba(245, 245, 245, 0.95);
+        --input-bg-color: rgba(0, 0, 0, 0.05);
+      }
+
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        overflow: hidden;
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+
+      .app-view {
+        display: none;
+      }
+      .app-view.active {
+        display: flex;
+      }
+
+      .squares {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        z-index: -1;
+      }
+      .squares li {
+        position: absolute;
+        display: block;
+        list-style: none;
+        width: 20px;
+        height: 20px;
+        background: var(--square-animation-color);
+        animation: animate 25s linear infinite;
+        bottom: -150px;
+        border-radius: 8px;
+        transition: background 0.3s ease;
+      }
+      .squares li:nth-child(1) {
+        left: 25%;
+        width: 80px;
+        height: 80px;
+        animation-delay: 0s;
+      }
+      .squares li:nth-child(2) {
+        left: 10%;
+        width: 20px;
+        height: 20px;
+        animation-delay: 2s;
+        animation-duration: 12s;
+      }
+      .squares li:nth-child(3) {
+        left: 70%;
+        width: 20px;
+        height: 20px;
+        animation-delay: 4s;
+      }
+      .squares li:nth-child(4) {
+        left: 40%;
+        width: 60px;
+        height: 60px;
+        animation-delay: 0s;
+        animation-duration: 18s;
+      }
+      .squares li:nth-child(5) {
+        left: 65%;
+        width: 20px;
+        height: 20px;
+        animation-delay: 0s;
+      }
+      .squares li:nth-child(6) {
+        left: 75%;
+        width: 110px;
+        height: 110px;
+        animation-delay: 3s;
+      }
+      .squares li:nth-child(7) {
+        left: 35%;
+        width: 150px;
+        height: 150px;
+        animation-delay: 7s;
+      }
+      .squares li:nth-child(8) {
+        left: 50%;
+        width: 25px;
+        height: 25px;
+        animation-delay: 15s;
+        animation-duration: 45s;
+      }
+      .squares li:nth-child(9) {
+        left: 20%;
+        width: 15px;
+        height: 15px;
+        animation-delay: 2s;
+        animation-duration: 35s;
+      }
+      .squares li:nth-child(10) {
+        left: 85%;
+        width: 150px;
+        height: 150px;
+        animation-delay: 0s;
+        animation-duration: 11s;
+      }
+      @keyframes animate {
+        0% {
+          transform: translateY(0) rotate(0deg);
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(-1000px) rotate(720deg);
+          opacity: 0;
+        }
+      }
+
+      .frosted-card {
+        background: var(--card-bg-color);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: background 0.3s ease;
+      }
+      .light-mode .frosted-card {
+        border: 1px solid rgba(0, 0, 0, 0.1);
+      }
+      .input-field {
+        background: var(--input-bg-color);
+        border: 1px solid transparent;
+        color: var(--text-color);
+        transition: all 0.3s ease;
+        border-radius: 0.75rem;
+        padding: 0.75rem 1.25rem;
+      }
+      .input-field:focus {
+        outline: none;
+        background: var(--input-focus-bg);
+        border-color: #6366f1;
+        box-shadow: 0 0 0 2px #6366f1;
+      }
+      .input-field::placeholder {
+        color: var(--text-gray-color);
+      }
+      .action-button {
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        transition: all 0.3s ease;
+      }
+      .action-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(99, 102, 241, 0.4);
+      }
+
+      #message-box {
+        position: fixed;
+        top: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 0.75rem 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+          0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        color: white;
+        font-weight: 600;
+        z-index: 150;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease-in-out, visibility 0s linear 0.3s;
+      }
+      #message-box.show {
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 0.3s ease-in-out, visibility 0s linear 0s;
+      }
+      #message-box.bg-success {
+        background-color: var(--success-color);
+      }
+      #message-box.bg-error {
+        background-color: var(--error-color);
+      }
+      #message-box.bg-info {
+        background-color: var(--info-color);
+      }
+
+      .user-highlight {
+        border: 1px solid #6366f1 !important;
+        box-shadow: 0 0 0 2px #6366f1;
+      }
+    </style>
+  </head>
+
+  <body class="flex items-center justify-center min-h-screen p-4">
+    <div class="fixed top-4 right-4 z-50 flex space-x-2">
+      <button
+        id="profile-button"
+        aria-label="User Profile"
+        class="flex items-center justify-center w-12 h-12 rounded-full cursor-pointer"
+        style="background-color: var(--input-bg-color); color: var(--text-color)"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-6 w-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            d="M5.121 17.804A13.93 13.93 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 0a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      </button>
+      <button
+        id="theme-toggle"
+        aria-label="Toggle dark and light mode"
+        class="flex items-center justify-center w-12 h-12 rounded-full cursor-pointer"
+        style="background-color: var(--input-bg-color); color: var(--text-color)"
+      >
+        <svg
+          id="sun-icon"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          class="w-6 h-6 hidden"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
+          />
+        </svg>
+        <svg
+          id="moon-icon"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          class="w-6 h-6 hidden"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <ul class="squares">
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+      <li></li>
+    </ul>
+
+    <div class="w-full h-full flex items-center justify-center">
+      <div
+        id="login-view"
+        class="app-view w-full max-w-md flex-col items-center justify-center"
+      >
+        <div class="p-8 sm:p-10 rounded-3xl frosted-card shadow-2xl w-full">
+          <div class="text-center mb-8">
+            <h1 class="text-4xl sm:text-5xl font-extrabold mb-2">
+              DIGITAL SUDOKU
+            </h1>
+            <p class="text-lg" style="color: var(--text-gray-color)">
+              Your next puzzle awaits.
+            </p>
+          </div>
+          <form id="login-form" class="space-y-6">
+            <div>
+              <label
+                for="login-username"
+                class="block text-sm font-medium mb-2"
+                style="color: var(--text-gray-color)"
+                >Username or Email</label
+              >
+              <input
+                type="text"
+                id="login-username"
+                class="w-full input-field"
+                placeholder="Enter your username or email"
+                required
+              />
+            </div>
+            <div>
+              <label
+                for="login-password"
+                class="block text-sm font-medium mb-2"
+                style="color: var(--text-gray-color)"
+                >Password</label
+              >
+              <input
+                type="password"
+                id="login-password"
+                class="w-full input-field"
+                placeholder="Enter your password"
+                required
+              />
+              <a
+                href="#"
+                class="show-forgot-link mt-2 text-sm text-indigo-400 hover:text-indigo-300 font-medium transition duration-300 block text-right"
+                >Forgot Password?</a
+              >
+            </div>
+            <button
+              type="submit"
+              class="w-full text-white font-bold py-3 rounded-xl action-button"
+            >
+              Login
+            </button>
+          </form>
+          <div class="mt-6 text-center">
+            <p class="text-sm" style="color: var(--text-gray-color)">
+              Don't have an account?
+              <a
+                href="#"
+                class="show-signup-link text-indigo-400 hover:text-indigo-300 font-semibold"
+                >Sign up here</a
+              >
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="signup-view"
+        class="app-view w-full max-w-md flex-col items-center justify-center"
+      >
+        <div class="p-8 sm:p-10 rounded-3xl frosted-card shadow-2xl w-full">
+          <div class="text-center mb-8">
+            <h1 class="text-4xl sm:text-5xl font-extrabold mb-2">
+              Create Account
+            </h1>
+            <p class="text-lg" style="color: var(--text-gray-color)">
+              Join the puzzle community.
+            </p>
+          </div>
+          <form id="signup-form" class="space-y-6">
+            <div>
+              <label
+                for="signup-username"
+                class="block text-sm font-medium mb-2"
+                style="color: var(--text-gray-color)"
+                >Username</label
+              >
+              <input
+                type="text"
+                id="signup-username"
+                class="w-full input-field"
+                placeholder="Choose a username"
+                required
+              />
+            </div>
+            <div>
+              <label
+                for="signup-email"
+                class="block text-sm font-medium mb-2"
+                style="color: var(--text-gray-color)"
+                >Email Address</label
+              >
+              <input
+                type="email"
+                id="signup-email"
+                class="w-full input-field"
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+            <div>
+              <label
+                for="signup-password"
+                class="block text-sm font-medium mb-2"
+                style="color: var(--text-gray-color)"
+                >Password</label
+              >
+              <input
+                type="password"
+                id="signup-password"
+                class="w-full input-field"
+                placeholder="Create a password"
+                required
+              />
+            </div>
+            <div>
+              <label
+                for="confirm-password"
+                class="block text-sm font-medium mb-2"
+                style="color: var(--text-gray-color)"
+                >Confirm Password</label
+              >
+              <input
+                type="password"
+                id="confirm-password"
+                class="w-full input-field"
+                placeholder="Confirm your password"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              class="w-full text-white font-bold py-3 rounded-xl action-button"
+            >
+              Sign Up
+            </button>
+          </form>
+          <div class="mt-6 text-center">
+            <p class="text-sm" style="color: var(--text-gray-color)">
+              Already have an account?
+              <a
+                href="#"
+                class="show-login-link text-indigo-400 hover:text-indigo-300 font-semibold"
+                >Login here</a
+              >
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="forgot-password-view"
+        class="app-view w-full max-w-md flex-col items-center justify-center"
+      >
+        <div class="p-8 sm:p-10 rounded-3xl frosted-card shadow-2xl w-full">
+          <div class="text-center mb-8">
+            <h1 class="text-4xl sm:text-5xl font-extrabold mb-2">
+              Forgot Password?
+            </h1>
+            <p class="text-lg" style="color: var(--text-gray-color)">
+              Enter your email to receive a reset link.
+            </p>
+          </div>
+          <form id="forgot-password-form" class="space-y-6">
+            <div>
+              <label
+                for="forgot-email"
+                class="block text-sm font-medium mb-2"
+                style="color: var(--text-gray-color)"
+                >Email Address</label
+              >
+              <input
+                type="email"
+                id="forgot-email"
+                class="w-full input-field"
+                placeholder="Enter your email"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              class="w-full text-white font-bold py-3 rounded-xl action-button"
+            >
+              Send Reset Link
+            </button>
+          </form>
+          <div class="mt-6 text-center">
+            <p class="text-sm" style="color: var(--text-gray-color)">
+              Remember your password?
+              <a
+                href="#"
+                class="show-login-link text-indigo-400 hover:text-indigo-300 font-semibold"
+                >Login here</a
+              >
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="select-mode-view"
+        class="app-view w-full flex-col items-center justify-center"
+      >
+        <h1 class="text-4xl sm:text-5xl font-extrabold mb-8 text-center">
+          Select your mode
+        </h1>
+        <div
+          class="flex flex-col sm:flex-row space-y-6 sm:space-y-0 sm:space-x-8 justify-center items-center w-full px-4"
+        >
+          <button
+            id="select-normal-mode"
+            class="w-full sm:w-64 px-8 py-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xl sm:text-2xl shadow-lg transition duration-300"
+          >
+            Normal Mode
+          </button>
+          <button
+            id="select-voice-command"
+            class="w-full sm:w-64 px-8 py-5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xl sm:text-2xl shadow-lg transition duration-300"
+          >
+            Voice Command
+          </button>
+        </div>
+      </div>
+
+      <div
+        id="normal-difficulty-view"
+        class="app-view w-full flex-col items-center justify-center text-center px-4 overflow-y-auto"
+      >
+        <h1 class="text-3xl sm:text-5xl font-extrabold mb-8">
+          Select Difficulty (Normal)
+        </h1>
+        <div
+          class="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 justify-center items-center max-w-lg mx-auto"
+        >
+          <button
+            data-difficulty="easy"
+            class="w-full px-8 py-5 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold text-xl sm:text-2xl shadow-lg transition"
+          >
+            Easy
+          </button>
+          <button
+            data-difficulty="medium"
+            class="w-full px-8 py-5 rounded-2xl bg-yellow-600 hover:bg-yellow-700 text-white font-bold text-xl sm:text-2xl shadow-lg transition"
+          >
+            Medium
+          </button>
+          <button
+            data-difficulty="hard"
+            class="w-full px-8 py-5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-xl sm:text-2xl shadow-lg transition"
+          >
+            Hard
+          </button>
+          <button
+            data-difficulty="training"
+            class="w-full px-8 py-5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xl sm:text-2xl shadow-lg transition"
+          >
+            Training
+          </button>
+        </div>
+
+        <div class="mt-6 w-full max-w-lg mx-auto">
+          <h2 class="text-2xl font-bold mb-4 text-center">
+            Normal Leaderboard
+          </h2>
+          <ol
+            id="normal-leaderboard"
+            class="space-y-2 list-none p-0"
+          ></ol>
+        </div>
+
+        <div class="mt-8 flex flex-col items-center">
+          <button
+            class="show-mode-select p-4 rounded-full bg-gray-600 hover:bg-gray-700 text-white shadow-lg transition"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-8 w-8"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div
+        id="voice-difficulty-view"
+        class="app-view w-full flex-col items-center justify-center text-center px-4 overflow-y-auto"
+      >
+        <h1 class="text-3xl sm:text-5xl font-extrabold mb-8">
+          Select Difficulty (Voice)
+        </h1>
+        <div
+          class="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 justify-center items-center max-w-lg mx-auto"
+        >
+          <button
+            data-difficulty="easy"
+            class="w-full px-8 py-5 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-bold text-xl sm:text-2xl shadow-lg transition"
+          >
+            Easy
+          </button>
+          <button
+            data-difficulty="medium"
+            class="w-full px-8 py-5 rounded-2xl bg-yellow-600 hover:bg-yellow-700 text-white font-bold text-xl sm:text-2xl shadow-lg transition"
+          >
+            Medium
+          </button>
+          <button
+            data-difficulty="hard"
+            class="w-full px-8 py-5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-xl sm:text-2xl shadow-lg transition"
+          >
+            Hard
+          </button>
+          <button
+            data-difficulty="training"
+            class="w-full px-8 py-5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xl sm:text-2xl shadow-lg transition"
+          >
+            Training
+          </button>
+        </div>
+
+        <div class="mt-6 w-full max-w-lg mx-auto">
+          <h2 class="text-2xl font-bold mb-4 text-center">
+            Voice Leaderboard
+          </h2>
+          <ol
+            id="voice-leaderboard"
+            class="space-y-2 list-none p-0"
+          ></ol>
+        </div>
+
+        <div class="mt-8 flex flex-col items-center">
+          <button
+            class="show-mode-select p-4 rounded-full bg-gray-600 hover:bg-gray-700 text-white shadow-lg transition"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-8 w-8"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div
+        id="level-select-view"
+        class="app-view w-full flex-col items-center justify-center text-center px-4"
+      >
+        <h1 id="level-select-title" class="text-3xl sm:text-5xl font-extrabold mb-8">
+          Select Level
+        </h1>
+        <div
+          id="level-buttons-container"
+          class="grid grid-cols-3 sm:grid-cols-5 gap-4 justify-center items-center max-w-2xl mx-auto"
+        ></div>
+        <div class="mt-8 flex flex-col items-center">
+          <button
+            id="back-to-difficulty"
+            class="p-4 rounded-full bg-gray-600 hover:bg-gray-700 text-white shadow-lg transition"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-8 w-8"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M10 19l-7-7m0 0l7-7m-7 7h18"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div
+        id="profile-view"
+        class="app-view w-full max-w-md flex-col items-center justify-center px-4"
+      >
+        <div
+          class="p-8 sm:p-10 rounded-3xl frosted-card shadow-2xl w-full text-center relative overflow-y-auto"
+          style="max-height: 90vh"
+        >
+          <div class="absolute top-4 right-4">
+            <button
+              id="back-from-profile"
+              class="p-3 rounded-full bg-gray-600 hover:bg-gray-700 text-white shadow-lg transition"
+            >
+              <svg
+                class="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                />
+              </svg>
+            </button>
+          </div>
+          <h1
+            class="text-4xl sm:text-5xl font-extrabold mb-2 pt-8"
+            id="profile-username"
+          >
+            User Profile
+          </h1>
+          <p class="text-lg mb-8" style="color: var(--text-gray-color)" id="profile-email">
+            email@example.com
+          </p>
+          <div class="grid grid-cols-3 gap-4 text-center mb-10">
+            <div>
+              <p class="text-3xl font-bold text-green-500" id="completed-levels">
+                0
+              </p>
+              <p class="text-sm" style="color: var(--text-gray-color)">Completed</p>
+            </div>
+            <div>
+              <p class="text-3xl font-bold text-yellow-500" id="remaining-levels">
+                0
+              </p>
+              <p class="text-sm" style="color: var(--text-gray-color)">Remaining</p>
+            </div>
+            <div>
+              <p class="text-3xl font-bold text-red-500" id="dropped-levels">0</p>
+              <p class="text-sm" style="color: var(--text-gray-color)">Dropped</p>
+            </div>
+          </div>
+
+          <h2 class="text-2xl font-bold mb-4 text-left">Stats - Normal Mode</h2>
+          <ul id="normal-stats-list" class="space-y-3 text-left"></ul>
+
+          <h2 class="text-2xl font-bold mb-4 mt-6 text-left">Stats - Voice Mode</h2>
+          <ul id="voice-stats-list" class="space-y-3 text-left"></ul>
+
+          <button
+            id="logout-button"
+            class="w-full text-white font-bold py-3 mt-8 rounded-xl bg-red-600 hover:bg-red-700 transition"
+          >
+            Logout
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="message-box">
+      <p id="message-text"></p>
+    </div>
+
+    <script>
+      // --- MOCK USER STATS for Demonstration of 'Correct Mark' ---
+      // This array stores completed level IDs as strings: "mode_difficulty_levelNumber" (e.g., "normal_easy_3")
+      // In a real application, this data would come from your backend.
+      const MOCK_COMPLETED_LEVELS = JSON.parse(
+        localStorage.getItem("completedLevels") || "[]"
+      );
+
+      // Function to check if a level is completed (for displaying the checkmark)
+      const isLevelCompleted = (mode, difficulty, levelIndex) => {
+        return MOCK_COMPLETED_LEVELS.includes(
+          `${mode}_${difficulty}_${levelIndex}`
+        );
+      };
+
+      // *** FIX IMPLEMENTED HERE ***
+      // Function to be called when a Sudoku is solved. 
+      // It updates local storage for the checkmark AND calls the server API.
+      const completeLevel = (mode, difficulty, levelIndex) => {
+        const levelID = `${mode}_${difficulty}_${levelIndex}`;
+        if (!MOCK_COMPLETED_LEVELS.includes(levelID)) {
+          MOCK_COMPLETED_LEVELS.push(levelID);
+          localStorage.setItem(
+            "completedLevels",
+            JSON.stringify(MOCK_COMPLETED_LEVELS)
+          );
+          
+          // CRITICAL FIX: Ensure the 'completed' status is sent to the server API
+          updateStatOnServer(mode, difficulty, 'completed'); 
+
+          console.log(`Level Completed: ${levelID}. Stats updated in localStorage and server.`);
+        }
+      };
+      // -----------------------------------------------------------------
+
+      // --- PHP/Backend Functions (Signup, Login, Stats Placeholders) ---
+      function signupUser(username, email, password, confirmPassword) {
+        showMessage("", "info", 0); // Hide immediately
+        if (password !== confirmPassword) {
+          showMessage("Passwords do not match.", "error");
+          return;
+        }
+        fetch("api/signup.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `username=${encodeURIComponent(username)}&email=${encodeURIComponent(
+            email
+          )}&password=${encodeURIComponent(password)}`,
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            showMessage(data.message, data.success ? "success" : "error");
+            if (data.success) {
+              document.getElementById("signup-form").reset();
+              setTimeout(() => {
+                document.querySelector("#signup-view .show-login-link").click();
+              }, 1500);
+            }
+          })
+          .catch((error) => {
+            console.error("Signup Error:", error);
+            showMessage("Error connecting to the server.", "error");
+          });
+      }
+      function loginUser(username, password, switchViewFn) {
+        showMessage("", "info", 0); // Hide immediately
+        fetch("api/login.php", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(
+            password
+          )}`,
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success && data.user) {
+              showMessage("Login successful! Redirecting...", "success", 2000);
+              localStorage.setItem(
+                "currentUser",
+                JSON.stringify({
+                  username: data.user.username,
+                  email: data.user.email,
+                })
+              );
+              sessionStorage.clear();
+              document.getElementById("login-form").reset();
+              setTimeout(() => {
+                switchViewFn("select-mode-view");
+              }, 1000);
+            } else {
+              const errorMsg = data.message || "Login failed. Please check credentials.";
+              showMessage(errorMsg, "error");
+            }
+          })
+          .catch((error) => {
+            console.error("Login Error:", error);
+            showMessage("Error connecting to the server.", "error");
+          });
+      }
+
+      // --- Updated Stats/Leaderboard Functions (Now REAL) ---
+      async function fetchStatsFromServer() {
+        try {
+          const response = await fetch("api/get_stats.php");
+          const data = await response.json();
+          if (data.success) {
+            return data.stats; // Returns the { normal: {...}, voice: {...} } object
+          } else {
+            console.error("fetchStatsFromServer error:", data.message);
+            // Return default structure on failure
+            return { normal: {}, voice: {} };
+          }
+        } catch (error) {
+          console.error("fetchStatsFromServer fetch error:", error);
+          return { normal: {}, voice: {} }; // Return default on network error
+        }
+      }
+      // This function now needs the 'mode'
+      async function updateStatOnServer(mode, difficulty, status) {
+        try {
+          const response = await fetch("api/update_stats.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              mode: mode,
+              difficulty: difficulty,
+              status: status,
+              // levelIndex is not needed by the new PHP script, but you could send it
+            }),
+          });
+          const data = await response.json();
+          return data.success;
+        } catch (error) {
+          console.error("updateStatOnServer fetch error:", error);
+          return false;
+        }
+      }
+
+      async function fetchLeaderboards(mode) {
+        try {
+          // Fetch the specific leaderboard
+          const response = await fetch(`api/get_leaderboard.php?mode=${mode}`);
+          const data = await response.json();
+          if (data.success) {
+            return data.leaderboard; // Returns the array: [{rank: 1, ...}, ...]
+          } else {
+            console.error(`fetchLeaderboards (${mode}) error:`, data.message);
+            return []; // Return empty array on failure
+          }
+        } catch (error) {
+          console.error(`fetchLeaderboards (${mode}) fetch error:`, error);
+          return []; // Return empty array on network error
+        }
+      }
+      // --- End Stats/Leaderboard Functions ---
+
+      // --- Message Display Function ---
+      let messageTimeout;
+      function showMessage(text, type = "info", duration = 3000) {
+        const messageBox = document.getElementById("message-box");
+        const messageText = document.getElementById("message-text");
+        clearTimeout(messageTimeout);
+        messageText.textContent = text;
+        messageBox.className = "message-box"; // Reset classes
+        if (text) {
+          if (type === "success") messageBox.classList.add("bg-success");
+          else if (type === "error") messageBox.classList.add("bg-error");
+          else messageBox.classList.add("bg-info");
+          messageBox.classList.add("show");
+          if (duration > 0) {
+            messageTimeout = setTimeout(() => {
+              messageBox.classList.remove("show");
+            }, duration);
+          }
+        } else {
+          messageBox.classList.remove("show");
+        }
+      }
+      // --- End Message Display Function ---
+
+      document.addEventListener("DOMContentLoaded", function() {
+        // --- Get DOM Elements ---
+        const themeToggle = document.getElementById("theme-toggle");
+        const sunIcon = document.getElementById("sun-icon");
+        const moonIcon = document.getElementById("moon-icon");
+        const profileButton = document.getElementById("profile-button");
+        const body = document.body;
+        const allViews = document.querySelectorAll(".app-view");
+        const levelSelectView = document.getElementById("level-select-view");
+        const levelButtonsContainer = document.getElementById(
+          "level-buttons-container"
+        );
+        const levelSelectTitle = document.getElementById("level-select-title");
+
+        // --- Theme Logic ---
+        const applyTheme = (theme) => {
+          if (theme === "light") {
+            body.classList.add("light-mode");
+            sunIcon.classList.remove("hidden");
+            moonIcon.classList.add("hidden");
+          } else {
+            body.classList.remove("light-mode");
+            sunIcon.classList.add("hidden");
+            moonIcon.classList.remove("hidden");
+          }
+        };
+        themeToggle.addEventListener("click", () => {
+          const iL = body.classList.toggle("light-mode");
+          const nT = iL ? "light" : "dark";
+          localStorage.setItem("theme", nT);
+          applyTheme(nT);
+        });
+        const sT =
+          localStorage.getItem("theme") ||
+          (window.matchMedia("(prefers-color-scheme: dark)").matches ?
+            "dark" :
+            "light");
+        applyTheme(sT);
+
+        // --- View Switching Logic (FIXED: Correctly tracks previous view) ---
+        let previousView = "login-view";
+        const switchView = (vId) => {
+          const aV = document.querySelector(".app-view.active");
+          
+          // Check if a view is currently active AND that view is NOT the Profile view.
+          // The current active view should be saved as 'previousView'.
+          if (aV && aV.id !== "profile-view") {
+              previousView = aV.id;
+          }
+          
+          allViews.forEach((v) => v.classList.remove("active"));
+          const tV = document.getElementById(vId);
+          if (tV) {
+            tV.classList.add("active");
+            sessionStorage.setItem("lastActiveView", vId);
+          }
+        };
+
+        // --- Level Selection Logic (Updated) ---
+        const LEVEL_COUNTS = {
+          // The base counts, including the training levels (used for the total levels per difficulty list)
+          normal: {
+            easy: 25,
+            medium: 25,
+            hard: 25,
+            training: 1
+          },
+          voice: {
+            easy: 10,
+            medium: 10,
+            hard: 10,
+            training: 1
+          },
+        };
+        
+        // List of difficulty keys to include in the overall Total Levels (Excludes 'training')
+        const DIFFICULTY_KEYS_FOR_TOTALS = ["easy", "medium", "hard"];
+
+
+        const showLevelSelect = (difficulty, mode) => {
+          sessionStorage.setItem("lastDifficulty", difficulty);
+          sessionStorage.setItem("lastMode", mode);
+          levelButtonsContainer.innerHTML = "";
+          const levelCount = LEVEL_COUNTS[mode]?.[difficulty] || 0;
+          if (!levelCount) return;
+          levelSelectView.dataset.mode = mode;
+          levelSelectView.dataset.difficulty = difficulty;
+          levelSelectTitle.textContent = `Select Level (${
+            difficulty[0].toUpperCase() + difficulty.slice(1)
+          } - ${mode === "voice" ? "Voice" : "Normal"})`;
+
+          for (let i = 1; i <= levelCount; i++) {
+            const isCompleted = isLevelCompleted(mode, difficulty, i); // Check completion status
+
+            const btn = document.createElement("button");
+            // Add checkmark if completed
+            btn.innerHTML = isCompleted ? `✅ ${i}` : `${i}`; 
+
+            btn.className =
+              "w-16 h-16 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xl shadow-lg transition flex items-center justify-center relative";
+
+            // Determine the correct file name
+            let fN;
+            const dCap = difficulty[0].toUpperCase() + difficulty.slice(1);
+
+            if (mode === "normal") {
+              // Normal Mode: e.g., Easy_level_1.html
+              fN = `${dCap}_level_${i}.html`;
+            } else if (mode === "voice") {
+              // Voice Mode: e.g., Voice_Easy_level_1.html
+              fN = `Voice_${dCap}_level_${i}.html`;
+            } else {
+              fN = "#"; // Fallback
+            }
+
+            btn.addEventListener("click", () => {
+              window.location.href = fN;
+            });
+            levelButtonsContainer.appendChild(btn);
+          }
+          switchView("level-select-view");
+        };
+
+        // --- Leaderboard View Function (Updated) ---
+        const updateLeaderboardView = async (mode) => {
+          const uD = JSON.parse(localStorage.getItem("currentUser"));
+          if (!uD) return;
+
+          const leaderboardListElement =
+            mode === "normal"
+              ? document.getElementById("normal-leaderboard")
+              : document.getElementById("voice-leaderboard");
+          if (!leaderboardListElement) return;
+
+          leaderboardListElement.innerHTML =
+            '<li class="p-3 text-gray-500 text-center">Loading...</li>'; // Show loading state
+
+          const leaderboardData = await fetchLeaderboards(mode); // Fetch specific leaderboard
+          leaderboardListElement.innerHTML = ""; // Clear loading state
+
+          const createLeaderboardItem = (entry) => {
+            const li = document.createElement("li");
+            li.className =
+              "p-3 rounded-xl input-field flex justify-between items-center";
+            if (entry.username === uD.username) {
+              li.classList.add("user-highlight");
+            }
+            li.innerHTML = `<span class="font-bold text-lg w-1/6 text-left">${entry.rank}.</span><span class="font-semibold w-3/6 text-left">${entry.username}</span><span class="text-green-500 font-medium w-2/6 text-right">C: ${entry.completed}</span>`;
+            return li;
+          };
+
+          if (leaderboardData && leaderboardData.length > 0) {
+            leaderboardData.forEach((entry) => {
+              leaderboardListElement.appendChild(createLeaderboardItem(entry));
+            });
+          } else {
+            leaderboardListElement.innerHTML =
+              '<li class="p-3 text-gray-500 text-center">No scores yet.</li>';
+          }
+        };
+
+        // --- Profile Logic (FIXED: Uses server completed count for accurate remaining calculation) ---
+        const getStats = async () => {
+          const s = await fetchStatsFromServer();
+          let tL = 0, // Total possible levels (excluding training)
+            tC = 0, // Total completed levels (from server)
+            tD = 0; // Total dropped levels (from server)
+
+          for (const mode of Object.keys(LEVEL_COUNTS)) {
+            // 1. Calculate Total Available Levels (tL) - Excluding training
+            for (const diff of DIFFICULTY_KEYS_FOR_TOTALS) { 
+              tL += LEVEL_COUNTS[mode][diff] || 0;
+            }
+            
+            // 2. Accumulate Completed (tC) and Dropped (tD) counts across ALL modes/difficulties (including training) from the server
+            for (const diff of Object.keys(LEVEL_COUNTS[mode])) { 
+              if (s[mode] && s[mode][diff]) {
+                tC += s[mode][diff].completed || 0; 
+                tD += s[mode][diff].dropped || 0;
+              }
+            }
+          }
+          
+          // FIX: Remaining calculation is now accurate: Total Levels - (Completed from Server + Dropped from Server)
+          const tR = Math.max(0, tL - tC - tD); 
+          
+          return {
+            stats: s,
+            totalLevels: tL,
+            totalCompleted: tC,
+            totalDropped: tD,
+            totalRemaining: tR
+          };
+        };
+
+        const updateProfileView = async () => {
+          const uD = JSON.parse(localStorage.getItem("currentUser"));
+          if (!uD) {
+            switchView("login-view");
+            return;
+          }
+          const {
+            stats: s,
+            totalCompleted: tC,
+            totalDropped: tD,
+            totalRemaining: tR
+          } = await getStats();
+          const normalStatsList = document.getElementById("normal-stats-list");
+          const voiceStatsList = document.getElementById("voice-stats-list");
+          document.getElementById("profile-username").textContent = uD.username;
+          document.getElementById("profile-email").textContent = uD.email;
+          document.getElementById("completed-levels").textContent = tC; 
+          document.getElementById("remaining-levels").textContent = tR;
+          document.getElementById("dropped-levels").textContent = tD; 
+          normalStatsList.innerHTML = "";
+          voiceStatsList.innerHTML = "";
+
+          const createStatItem = (difficulty, count, mode) => {
+            // NOTE: We rely on the server's completed and dropped counts for consistency in the detailed stats lists too.
+            // compLocal is only used for checking the checkmark on the level select buttons.
+            
+            // Get completed count from server for stats display
+            const compServer = (s[mode]?.[difficulty]?.completed || 0);
+
+            // Get dropped count from server response
+            const drop = (s[mode]?.[difficulty]?.dropped || 0);
+            
+            // FIX: Calculate remaining for the specific difficulty using server's completed/dropped counts.
+            const rem = Math.max(0, count - compServer - drop); 
+            
+            const li = document.createElement("li");
+            li.className =
+              "p-3 rounded-xl input-field flex justify-between items-center";
+            li.innerHTML = `<span class="font-semibold text-lg">${
+              difficulty[0].toUpperCase() + difficulty.slice(1)
+            } (${count} ${
+              count > 1 ? "levels" : "level"
+            })</span><div class="text-sm space-x-4"><span class="text-green-500 font-medium">C: ${compServer}</span> <span class="text-yellow-500 font-medium">R: ${rem}</span> <span class="text-red-500 font-medium">D: ${drop}</span></div>`;
+            return li;
+          };
+
+          for (const diff of ["easy", "medium", "hard", "training"]) {
+            const count = LEVEL_COUNTS.normal[diff];
+            if (count > 0) {
+              normalStatsList.appendChild(createStatItem(diff, count, "normal"));
+            }
+          }
+          for (const diff of ["easy", "medium", "hard", "training"]) {
+            const count = LEVEL_COUNTS.voice[diff];
+            if (count > 0) {
+              voiceStatsList.appendChild(createStatItem(diff, count, "voice"));
+            }
+          }
+
+          switchView("profile-view");
+        };
+        // --- End Profile Logic ---
+
+
+        // --- Event Listeners (Form/Button clicks) ---
+        // MODIFIED: Difficulty buttons now lead to showLevelSelect
+        document
+          .querySelectorAll(
+            "#normal-difficulty-view [data-difficulty], #voice-difficulty-view [data-difficulty]"
+          )
+          .forEach((b) => {
+            b.addEventListener("click", (e) => {
+              const diff = e.target.dataset.difficulty;
+              const mV = e.target.closest(".app-view");
+              const mode = mV.id.includes("normal") ? "normal" : "voice";
+
+              if (diff === "training") {
+                // Training mode links remain direct
+                if (mode === "normal") {
+                  window.location.href = "Normal_training_mode.html";
+                } else {
+                  window.location.href = "Training_voice.html";
+                }
+              } else {
+                // Easy/Medium/Hard now go to the level select view
+                showLevelSelect(diff, mode);
+              }
+            });
+          });
+
+        document
+          .getElementById("back-to-difficulty")
+          .addEventListener("click", () => {
+            const m = levelSelectView.dataset.mode;
+            switchView(
+              m === "normal"
+                ? "normal-difficulty-view"
+                : "voice-difficulty-view"
+            );
+          });
+        document
+          .querySelector(".show-signup-link")
+          .addEventListener("click", (e) => {
+            e.preventDefault();
+            switchView("signup-view");
+          });
+        document
+          .querySelector(".show-forgot-link")
+          .addEventListener("click", (e) => {
+            e.preventDefault();
+            switchView("forgot-password-view");
+          });
+        document.querySelectorAll(".show-login-link").forEach((l) =>
+          l.addEventListener("click", (e) => {
+            e.preventDefault();
+            switchView("login-view");
+          })
+        );
+
+        // --- Modified Mode Selection Listeners ---
+        document
+          .getElementById("select-normal-mode")
+          .addEventListener("click", (e) => {
+            e.preventDefault();
+            switchView("normal-difficulty-view");
+            updateLeaderboardView("normal"); // <-- Load leaderboard
+          });
+        document
+          .getElementById("select-voice-command")
+          .addEventListener("click", (e) => {
+            e.preventDefault();
+            switchView("voice-difficulty-view");
+            updateLeaderboardView("voice"); // <-- Load leaderboard
+          });
+
+        document.querySelectorAll(".show-mode-select").forEach((l) =>
+          l.addEventListener("click", (e) => {
+            e.preventDefault();
+            switchView("select-mode-view");
+          })
+        );
+        document
+          .getElementById("signup-form")
+          .addEventListener("submit", (e) => {
+            e.preventDefault();
+            signupUser(
+              document.getElementById("signup-username").value,
+              document.getElementById("signup-email").value,
+              document.getElementById("signup-password").value,
+              document.getElementById("confirm-password").value
+            );
+          });
+        document.getElementById("login-form").addEventListener("submit", (e) => {
+          e.preventDefault();
+          loginUser(
+            document.getElementById("login-username").value,
+            document.getElementById("login-password").value,
+            switchView
+          );
+        });
+        document
+          .getElementById("forgot-password-form")
+          .addEventListener("submit", (e) => {
+            e.preventDefault();
+            showMessage("Password reset link sent (simulation)!", "success");
+            document.getElementById("forgot-password-form").reset();
+          });
+
+        profileButton.addEventListener("click", () => {
+          updateProfileView();
+        });
+        document
+          .getElementById("back-from-profile")
+          .addEventListener("click", () => {
+            // Navigates back to the last non-profile view
+            switchView(previousView);
+          });
+        document
+          .getElementById("logout-button")
+          .addEventListener("click", () => {
+            localStorage.removeItem("currentUser");
+            localStorage.removeItem("completedLevels"); // Clear mock stats on logout
+            sessionStorage.clear();
+            switchView("login-view");
+          });
+
+        // --- Initial View Logic ---
+        const cU = localStorage.getItem("currentUser");
+        const lV = sessionStorage.getItem("lastActiveView");
+        if (cU && lV) {
+          if (lV === "level-select-view") {
+            const ld = sessionStorage.getItem("lastDifficulty"),
+              lm = sessionStorage.getItem("lastMode");
+            if (ld && lm) {
+              showLevelSelect(ld, lm);
+            } else {
+              switchView("select-mode-view");
+            }
+          } else {
+            if (
+              lV === "login-view" ||
+              lV === "signup-view" ||
+              lV === "forgot-password-view"
+            ) {
+              switchView("select-mode-view");
+            } else {
+              switchView(lV);
+            }
+          }
+        } else if (cU) {
+          switchView("select-mode-view");
+        } else {
+          switchView("login-view");
+        }
+      }); // End DOMContentLoaded
+    </script>
+  </body>
+</html>

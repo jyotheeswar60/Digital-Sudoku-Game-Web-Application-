@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sudoku - Interactive Tutorial (Corrected)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-color: #121212;
+            --text-color: #e1e1e1;
+            --fixed-text-color: #ffffff;
+            --user-text-color: #64b5f6;
+            --hinted-text-color: #81c784;
+            --grid-border-color: #3a3a3c;
+            --grid-thick-border-color: #9e9e9e;
+            --selected-cell-bg: #2c3e50;
+            --highlighted-cell-bg: #2c2c2e;
+            --match-highlight-bg: #5a9;
+            --tutorial-highlight-bg: rgba(255, 255, 0, 0.25);
+            --error-cell-bg: #cf6679;
+            --button-bg: #1e1e1e;
+            --button-hover-bg: #2c2c2e;
+            --square-animation-color: rgba(255, 255, 255, 0.05);
+            --modal-bg: rgba(30, 30, 30, 0.95);
+        }
+
+        .light-mode {
+            --bg-color: #ffffff;
+            --text-color: #212121;
+            --fixed-text-color: #000000;
+            --user-text-color: #1976d2;
+            --hinted-text-color: #2e7d32;
+            --grid-border-color: #d1d1d6;
+            --grid-thick-border-color: #333333;
+            --selected-cell-bg: #bbdefb;
+            --highlighted-cell-bg: #efeff4;
+            --match-highlight-bg: #a5d6a7;
+            --tutorial-highlight-bg: rgba(255, 255, 0, 0.25);
+            --error-cell-bg: #e57373;
+            --button-bg: #f5f5f5;
+            --button-hover-bg: #e0e0e0;
+            --square-animation-color: rgba(0, 0, 0, 0.05);
+            --modal-bg: rgba(245, 245, 245, 0.95);
+        }
+
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            box-sizing: border-box;
+            overflow: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .squares { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: -1; }
+        .squares li { position: absolute; display: block; list-style: none; width: 20px; height: 20px; background: var(--square-animation-color); animation: animate 25s linear infinite; bottom: -150px; border-radius: 8px; }
+        @keyframes animate { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(-120vh) rotate(720deg); opacity: 0; } }
+        .squares li:nth-child(1) { left: 25%; width: 80px; height: 80px; animation-delay: 0s; }
+        .squares li:nth-child(2) { left: 10%; width: 20px; height: 20px; animation-delay: 2s; animation-duration: 12s; }
+        .squares li:nth-child(3) { left: 70%; width: 20px; height: 20px; animation-delay: 4s; }
+        .squares li:nth-child(4) { left: 40%; width: 60px; height: 60px; animation-delay: 0s; animation-duration: 18s; }
+        .squares li:nth-child(5) { left: 65%; width: 20px; height: 20px; animation-delay: 0s; }
+        .squares li:nth-child(6) { left: 75%; width: 110px; height: 110px; animation-delay: 3s; }
+        .squares li:nth-child(7) { left: 35%; width: 150px; height: 150px; animation-delay: 7s; }
+        .squares li:nth-child(8) { left: 50%; width: 25px; height: 25px; animation-delay: 15s; animation-duration: 45s; }
+        .squares li:nth-child(9) { left: 20%; width: 15px; height: 15px; animation-delay: 2s; animation-duration: 35s; }
+        .squares li:nth-child(10) { left: 85%; width: 150px; height: 150px; animation-delay: 0s; animation-duration: 11s; }
+
+        .game-container { display: flex; flex-direction: row; align-items: center; gap: 2rem; width: 100%; justify-content: center; }
+        .layout-spacer { width: 300px; flex-shrink: 0; visibility: hidden; }
+        .game-board-and-controls { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; flex-shrink: 0; }
+        #message-area { font-weight: bold; font-size: 1.3rem; line-height: 1.6; text-align: left; width: 300px; flex-shrink: 0; padding: 1.5rem; border-radius: 8px; background-color: var(--button-bg); border: 1px solid var(--grid-border-color); }
+        .game-board-and-controls h1 { font-size: 2.5rem; font-weight: 700; color: var(--fixed-text-color); margin-bottom: 0; text-align: center; }
+        
+        .sudoku-grid { display: grid; grid-template-columns: repeat(9, clamp(35px, 5vw, 50px)); grid-template-rows: repeat(9, clamp(35px, 5vw, 50px)); border: 3px solid var(--grid-thick-border-color); border-radius: 8px; overflow: hidden; background-color: var(--button-bg); position: relative;}
+        .sudoku-cell { display: flex; align-items: center; justify-content: center; font-size: clamp(1.2rem, 2.5vw, 1.7rem); font-weight: 600; border: 1px solid var(--grid-border-color); cursor: pointer; transition: background-color 0.2s ease, color 0.2s ease; user-select: none; }
+        .sudoku-cell:nth-child(3n) { border-right: 2px solid var(--grid-thick-border-color); }
+        .sudoku-cell:nth-child(9n) { border-right: none; }
+        .row-border { border-bottom: 2px solid var(--grid-thick-border-color); }
+        
+        .sudoku-grid.tutorial-active .sudoku-cell:not(.tutorial-focus):not(.fixed) { cursor: not-allowed; pointer-events: none; }
+        .sudoku-cell.fixed { color: var(--fixed-text-color); cursor: default; pointer-events: none; }
+        .sudoku-cell.user-filled { color: var(--user-text-color); font-weight: 700; }
+        .sudoku-cell.hinted { color: var(--hinted-text-color); font-weight: 700; cursor: default; pointer-events: none; }
+        .sudoku-cell.selected { background-color: var(--selected-cell-bg) !important; }
+        .sudoku-cell.highlighted { background-color: var(--highlighted-cell-bg); }
+        .sudoku-cell.match-highlight { background-color: var(--match-highlight-bg) !important; }
+        .sudoku-cell.tutorial-highlight { background-color: var(--tutorial-highlight-bg); }
+        .sudoku-cell.tutorial-focus { cursor: pointer !important; pointer-events: auto !important; }
+        .sudoku-cell.error-shake { animation: shake 0.5s; background-color: var(--error-cell-bg); }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+        .number-pad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; }
+        .number-pad.tutorial-active button:not(.tutorial-focus-button) { cursor: not-allowed; pointer-events: none; opacity: 0.5; }
+        .number-pad button { width: clamp(40px, 8vw, 60px); height: clamp(40px, 8vw, 60px); font-size: 1.5rem; font-weight: bold; cursor: pointer; border-radius: 8px; border: none; background-color: var(--button-bg); color: var(--text-color); transition: background-color 0.2s ease; }
+        .number-pad button:hover { background-color: var(--button-hover-bg); }
+        .number-pad button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .number-pad button.clear-btn { color: var(--error-cell-bg); }
+
+        .ui-buttons { position: fixed; top: 1rem; right: 1rem; z-index: 50; display: flex; gap: 0.5rem; }
+        .ui-button { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; border-radius: 50%; cursor: pointer; border: 1px solid var(--grid-border-color); background-color: var(--button-bg); color: var(--text-color); }
+        .ui-button:disabled { opacity: 0.5; cursor: not-allowed; }
+        #back-button { position: fixed; top: 1rem; left: 1rem; z-index: 50; }
+        .hidden { display: none; }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: grid; place-items: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .modal-overlay.visible { opacity: 1; pointer-events: auto; }
+        .modal-content { background-color: var(--modal-bg); backdrop-filter: blur(10px); padding: 2rem; border-radius: 16px; width: 90%; max-width: 450px; border: 1px solid var(--grid-border-color); position: relative; }
+        .modal-content h2, h3 { font-weight: 700; color: var(--fixed-text-color); margin: 0 0 1.5rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid var(--grid-thick-border-color); }
+        .modal-content h2 { font-size: 1.75rem; }
+        .modal-content h3 { font-size: 1.25rem; margin-top: 2rem; border-bottom-style: dashed; }
+        .modal-content ul, .modal-content ol { padding-left: 1.25rem; }
+        .modal-content li { margin-bottom: 1rem; }
+        .modal-content strong { display: block; font-size: 1.1rem; margin-bottom: 0.25rem; }
+        .close-modal { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 2rem; line-height: 1; cursor: pointer; color: var(--text-color); }
+
+        @media (max-width: 1024px) {
+            .game-container { flex-direction: column; gap: 1.5rem; }
+            .layout-spacer { display: none; }
+            #message-area { width: 100%; max-width: 500px; order: -1; text-align: center; min-height: 48px; }
+        }
+    </style>
+</head>
+<body>
+    <ul class="squares" aria-hidden="true">
+        <li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li>
+    </ul>
+
+    <button id="back-button" class="ui-button" aria-label="Go back" title="Go back">
+        <svg style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+    </button>
+
+    <div class="ui-buttons">
+        <button id="new-game-button" class="ui-button" aria-label="New Game" title="Start a new game">
+            <svg style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-11.664 0l4.992-4.992m-4.993 0l3.181 3.183M3.75 12h16.5m-16.5 0l4.992 4.992"/></svg>
+        </button>
+        <button id="hint-button" class="ui-button" aria-label="Get a hint" title="Get a hint (3 left)">
+             <svg style="width: 1.5rem; height: 1.5rem"  xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2Zm1.145 15.145c-.34.34-.793.51-1.245.51s-.905-.17-1.245-.51a1.75 1.75 0 0 1 0-2.49c.68-.68 1.25-1.291 1.25-2.096 0-.616-.407-1.059-1.041-1.059-.68 0-1.125.488-1.125 1.211 0 .414-.336.75-.75.75s-.75-.336-.75-.75c0-1.472.983-2.711 2.625-2.711 1.642 0 2.541 1.13 2.541 2.559 0 1.25-.853 2.15-1.5 2.8-.21.21-.355.371-.445.49a.25.25 0 0 0 0 .355c.09.119.235.28.445.49.34.34.793.51 1.245.51s.905-.17 1.245-.51c.68-.68.68-1.81 0-2.49a.75.75 0 0 1 1.06 1.06c-.88.88-2.085 1.32-3.295 1.32s-2.415-.44-3.295-1.32a.75.75 0 1 1 1.06-1.06c.34.34.793.51 1.245.51s.905-.17 1.245-.51a.25.25 0 0 0 0-.355c-.09-.119-.235-.28-.445-.49-.647-.65-1.5-1.55-1.5-2.8 0-1.429.9-2.559 2.541-2.559 1.642 0 2.625 1.239 2.625 2.711 0 .805.57 1.416 1.25 2.096a1.75 1.75 0 0 1 0 2.49Z M12 14.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
+        </button>
+        <button id="rules-button" class="ui-button" aria-label="Show rules" title="Show rules">
+            <svg style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"/></svg>
+        </button>
+        <button id="theme-toggle" class="ui-button" aria-label="Toggle theme" title="Toggle theme">
+            <svg id="sun-icon" class="hidden" style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            <svg id="moon-icon" class="hidden" style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+        </button>
+    </div>
+
+    <main>
+        <div class="game-container" role="application">
+            <div class="layout-spacer"></div>
+            <div class="game-board-and-controls">
+                <h1 id="game-title">Sudoku<br><b> Tutorial</b></h1>
+                <div id="sudoku-grid" class="sudoku-grid" aria-label="9 by 9 puzzle grid"></div>
+                <div id="number-pad" class="number-pad" role="toolbar" aria-label="Number pad"></div>
+            </div>
+            <div id="message-area" role="status" aria-live="polite"></div>
+        </div>
+    </main>
+
+    <div id="rules-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="close-rules-modal" class="close-modal">&times;</button>
+            <h2>9x9 Rules</h2>
+            <ul>
+                <li><strong>Row Rule</strong><span>Each row must contain the numbers 1 through 9.</span></li>
+                <li><strong>Column Rule</strong><span>Each column must also contain the numbers 1 through 9.</span></li>
+                <li><strong>Box Rule</strong><span>Each of the nine 3x3 sub-grids must contain the numbers 1 through 9.</span></li>
+            </ul>
+            <h3>Beginner's Tip</h3>
+            <p>Look for a row, column, or 3x3 box that is missing only one or two numbers. It's often easiest to figure out which number goes there first!</p>
+        </div>
+    </div>
+
+    <script>
+        "use strict";
+        document.addEventListener("DOMContentLoaded", () => {
+            const body = document.body;
+            const gridElement = document.getElementById("sudoku-grid");
+            const numberPadElement = document.getElementById("number-pad");
+            const messageArea = document.getElementById("message-area");
+            
+            const GRID_SIZE = 9;
+            const HINT_LIMIT = 3;
+            let currentGrid = [], originalGrid = [], solutionGrid = [];
+            let selectedCell = null;
+            let hintCount = 0;
+
+            // --- TUTORIAL STATE ---
+            let tutorialStep = 0;
+            // CORRECTED tutorial steps
+            const tutorialSteps = [
+                { 
+                    message: "Welcome! Let's find our first number. In the highlighted top-left box, where can the number 4 go?",
+                    highlight: { type: 'box', row: 0, col: 0 },
+                    action: { type: 'select', row: 0, col: 0 }
+                },
+                { 
+                    message: "The other 4s on the board (now lit up) block off rows and columns. This leaves only one empty cell for the 4. Click that cell.",
+                    highlight: { type: 'peers', number: 4 },
+                    action: { type: 'select', row: 0, col: 0 }
+                },
+                { 
+                    message: "Excellent! Now select '4' from the number pad below to place it.",
+                    highlight: {},
+                    action: { type: 'number', number: 4 }
+                },
+                { 
+                    message: "Great! Let's learn a new technique. Look at the highlighted middle row. It's only missing one number.",
+                    highlight: { type: 'row', row: 4 },
+                    action: { type: 'select', row: 4, col: 4 }
+                },
+                { 
+                    message: "Correct! The only number missing from that row is 6. Now select '6' from the number pad.",
+                    highlight: {},
+                    action: { type: 'number', number: 6 }
+                },
+                { 
+                    message: "You've learned two key techniques! \n The rest of the puzzle is unlocked.\n Solve it on your own , so you could complete this Tutorial \n Good luck!",
+                    highlight: {},
+                    action: { type: 'end' }
+                }
+            ];
+
+            const fixedPuzzle = [
+                [0, 0, 3, 0, 2, 0, 6, 0, 0],[9, 0, 0, 3, 0, 5, 0, 0, 1],[0, 0, 1, 8, 0, 6, 4, 0, 0],
+                [0, 0, 8, 1, 0, 2, 9, 0, 0],[7, 0, 0, 0, 0, 0, 0, 0, 8],[0, 0, 6, 7, 0, 8, 2, 0, 0],
+                [0, 0, 2, 6, 0, 9, 5, 0, 0],[8, 0, 0, 2, 0, 3, 0, 0, 9],[0, 0, 5, 0, 1, 0, 3, 0, 0]
+            ];
+            const fixedSolution = [
+                [4, 8, 3, 9, 2, 1, 6, 5, 7],[9, 6, 7, 3, 4, 5, 8, 2, 1],[2, 5, 1, 8, 7, 6, 4, 9, 3],
+                [5, 4, 8, 1, 3, 2, 9, 7, 6],[7, 2, 9, 5, 6, 4, 1, 3, 8],[3, 1, 6, 7, 9, 8, 2, 4, 5],
+                [1, 3, 2, 6, 8, 9, 5, 7, 4],[8, 7, 4, 2, 5, 3, 1, 6, 9],[6, 9, 5, 4, 1, 7, 3, 8, 2]
+            ];
+
+            const deepCopyGrid = (g) => g.map((r) => [...r]);
+
+            function setupUIListeners() {
+                const ui = { themeToggle: document.getElementById("theme-toggle"), sunIcon: document.getElementById("sun-icon"), moonIcon: document.getElementById("moon-icon"), rulesButton: document.getElementById("rules-button"), rulesModal: document.getElementById("rules-modal"), closeRulesModal: document.getElementById("close-rules-modal"), hintButton: document.getElementById("hint-button"), backButton: document.getElementById("back-button"), newGameButton: document.getElementById("new-game-button") };
+                const applyTheme = (theme) => { body.classList.toggle("light-mode", theme === "light"); ui.sunIcon.classList.toggle("hidden", theme === "dark"); ui.moonIcon.classList.toggle("hidden", theme === "light"); };
+                ui.themeToggle.addEventListener("click", () => applyTheme(body.classList.contains("light-mode") ? "dark" : "light"));
+                ui.rulesButton.addEventListener("click", () => ui.rulesModal.classList.add("visible"));
+                ui.closeRulesModal.addEventListener("click", () => ui.rulesModal.classList.remove("visible"));
+                ui.rulesModal.addEventListener("click", (e) => { if (e.target === ui.rulesModal) ui.rulesModal.classList.remove("visible"); });
+                applyTheme(window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+                ui.backButton.addEventListener("click", () => window.history.back());
+                ui.newGameButton.addEventListener("click", newGame);
+                ui.hintButton.addEventListener("click", giveHint);
+            }
+
+            function newGame() {
+                messageArea.textContent = "";
+                selectedCell = null;
+                hintCount = 0;
+                tutorialStep = 0;
+                document.getElementById('hint-button').disabled = true;
+                originalGrid = deepCopyGrid(fixedPuzzle);
+                currentGrid = deepCopyGrid(fixedPuzzle);
+                solutionGrid = deepCopyGrid(fixedSolution);
+                renderGrid();
+                if (!numberPadElement.innerHTML) renderNumberPad();
+                numberPadElement.querySelectorAll("button").forEach((btn) => (btn.disabled = false));
+                runTutorialStep();
+            }
+
+            function runTutorialStep() {
+                const step = tutorialSteps[tutorialStep];
+                messageArea.textContent = step.message;
+                document.querySelectorAll(".sudoku-cell").forEach(c => c.classList.remove("tutorial-highlight", "tutorial-focus", "match-highlight"));
+                document.querySelectorAll(".number-pad button").forEach(b => b.classList.remove("tutorial-focus-button"));
+                gridElement.classList.add("tutorial-active");
+                numberPadElement.classList.add("tutorial-active");
+
+                if (step.highlight.type === 'box') {
+                    const boxRowStart = Math.floor(step.highlight.row / 3) * 3, boxColStart = Math.floor(step.highlight.col / 3) * 3;
+                    for (let r_offset = 0; r_offset < 3; r_offset++) {
+                        for (let c_offset = 0; c_offset < 3; c_offset++) {
+                            gridElement.querySelector(`[data-row='${boxRowStart + r_offset}'][data-col='${boxColStart + c_offset}']`).classList.add('tutorial-highlight');
+                        }
+                    }
+                } else if (step.highlight.type === 'row') {
+                     for (let c = 0; c < GRID_SIZE; c++) {
+                        gridElement.querySelector(`[data-row='${step.highlight.row}'][data-col='${c}']`).classList.add('tutorial-highlight');
+                    }
+                } else if (step.highlight.type === 'peers') {
+                     document.querySelectorAll('.sudoku-cell').forEach(cell => {
+                        if (cell.textContent == step.highlight.number) cell.classList.add('match-highlight');
+                    });
+                }
+
+                if (step.action.type === 'select') {
+                    gridElement.querySelector(`[data-row='${step.action.row}'][data-col='${step.action.col}']`).classList.add('tutorial-focus');
+                } else if (step.action.type === 'number') {
+                    numberPadElement.querySelector(`button:not(.clear-btn):nth-child(${step.action.number})`).classList.add('tutorial-focus-button');
+                } else if (step.action.type === 'end') {
+                    gridElement.classList.remove("tutorial-active");
+                    numberPadElement.classList.remove("tutorial-active");
+                    const hintButton = document.getElementById('hint-button');
+                    hintButton.disabled = false;
+                    hintButton.setAttribute("title", `Get a hint (${HINT_LIMIT - hintCount} left)`);
+                    renderGrid();
+                }
+            }
+            
+            function isMoveValid(grid, row, col, num) {
+                const tempGrid = deepCopyGrid(grid);
+                tempGrid[row][col] = 0;
+                for (let i = 0; i < GRID_SIZE; i++) { if (tempGrid[row][i] === num || tempGrid[i][col] === num) return false; }
+                const boxRowStart = Math.floor(row / 3) * 3, boxColStart = Math.floor(col / 3) * 3;
+                for (let r = 0; r < 3; r++) { for (let c = 0; c < 3; c++) { if (tempGrid[boxRowStart + r][boxColStart + c] === num) return false; } }
+                return true;
+            }
+
+            function renderGrid() {
+                gridElement.innerHTML = "";
+                const isTutorialActive = tutorialStep < tutorialSteps.length - 1;
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const cell = document.createElement("div");
+                        cell.className = "sudoku-cell";
+                        cell.dataset.row = r; cell.dataset.col = c;
+                        if (r === 2 || r === 5) cell.classList.add("row-border");
+                        const value = currentGrid[r][c];
+                        if (value !== 0) {
+                            cell.textContent = value;
+                            cell.classList.add(originalGrid[r][c] !== 0 ? "fixed" : "user-filled");
+                        }
+                        if (!isTutorialActive && currentGrid[r][c] === 0) {
+                            cell.addEventListener("click", () => handleCellClick(cell));
+                        }
+                        gridElement.appendChild(cell);
+                    }
+                }
+                 if(isTutorialActive) {
+                    gridElement.addEventListener('click', handleTutorialClick);
+                }
+            }
+            
+            function handleTutorialClick(e) {
+                if(!e.target.classList.contains('tutorial-focus')) {
+                    if (e.target.classList.contains('sudoku-cell')) {
+                        e.target.classList.add("error-shake");
+                        setTimeout(() => e.target.classList.remove("error-shake"), 500);
+                    }
+                    return;
+                };
+                handleCellClick(e.target);
+            }
+
+            function renderNumberPad() {
+                for (let i = 1; i <= GRID_SIZE; i++) {
+                    const button = document.createElement("button");
+                    button.textContent = i;
+                    button.addEventListener("click", () => handleNumberClick(i));
+                    numberPadElement.appendChild(button);
+                }
+                const clearButton = document.createElement("button");
+                clearButton.textContent = "X";
+                clearButton.className = "clear-btn";
+                clearButton.addEventListener("click", handleClearClick);
+                numberPadElement.appendChild(clearButton);
+            }
+
+            function giveHint() {
+                if (hintCount >= HINT_LIMIT || tutorialStep < tutorialSteps.length - 1) return;
+                const emptyCells = [];
+                for (let r = 0; r < GRID_SIZE; r++) { for (let c = 0; c < GRID_SIZE; c++) { if (currentGrid[r][c] === 0) emptyCells.push({ r, c }); } }
+                if (emptyCells.length === 0) return;
+                const { r, c } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                const solutionNumber = solutionGrid[r][c];
+                currentGrid[r][c] = solutionNumber;
+                const cellNode = gridElement.querySelector(`[data-row='${r}'][data-col='${c}']`);
+                if (cellNode) {
+                    cellNode.textContent = solutionNumber;
+                    cellNode.className = "sudoku-cell hinted"; 
+                    if (r === 2 || r === 5) cellNode.classList.add("row-border");
+                }
+                hintCount++;
+                const hintButton = document.getElementById('hint-button');
+                hintButton.setAttribute("title", `Get a hint (${HINT_LIMIT - hintCount} left)`);
+                if (hintCount >= HINT_LIMIT) {
+                    hintButton.disabled = true;
+                    hintButton.setAttribute("title", "No hints left");
+                }
+                checkWinCondition();
+            }
+
+            function updateHighlights(row, col, value, state) {
+                document.querySelectorAll(".sudoku-cell").forEach((cell) => {
+                    cell.classList.remove("highlighted", "match-highlight");
+                    if (state) {
+                        const r = parseInt(cell.dataset.row), c = parseInt(cell.dataset.col);
+                        const boxRowStart = Math.floor(row / 3) * 3, boxColStart = Math.floor(col / 3) * 3;
+                        const inBox = r >= boxRowStart && r < boxRowStart + 3 && c >= boxColStart && c < boxColStart + 3;
+                        if (r === row || c === col || inBox) cell.classList.add("highlighted");
+                        if (value !== 0 && parseInt(cell.textContent) === value) cell.classList.add("match-highlight");
+                    }
+                });
+            }
+
+            function handleCellClick(cell) {
+                const isTutorialActive = tutorialStep < tutorialSteps.length - 1;
+                if (isTutorialActive) {
+                    const currentAction = tutorialSteps[tutorialStep].action;
+                    if (currentAction.type !== 'select' || cell.dataset.row != currentAction.row || cell.dataset.col != currentAction.col) return;
+                }
+                
+                if (selectedCell) {
+                    selectedCell.classList.remove("selected");
+                    if (!isTutorialActive) updateHighlights(-1, -1, 0, false);
+                }
+                
+                selectedCell = (selectedCell === cell) ? null : cell;
+
+                if (selectedCell) {
+                    selectedCell.classList.add("selected");
+                    if (!isTutorialActive) {
+                        const value = currentGrid[parseInt(cell.dataset.row)][parseInt(cell.dataset.col)];
+                        updateHighlights(parseInt(cell.dataset.row), parseInt(cell.dataset.col), value, true);
+                    }
+                }
+
+                if (isTutorialActive && selectedCell) {
+                    tutorialStep++;
+                    runTutorialStep();
+                }
+            }
+
+            function handleNumberClick(num) {
+                const isTutorialActive = tutorialStep < tutorialSteps.length - 1;
+                
+                if (isTutorialActive) {
+                    const currentAction = tutorialSteps[tutorialStep].action;
+                     if (currentAction.type !== 'number' || num !== currentAction.number) {
+                        if(selectedCell) {
+                            selectedCell.classList.add("error-shake");
+                            setTimeout(() => selectedCell.classList.remove("error-shake"), 500);
+                        }
+                        return;
+                    }
+                }
+
+                if (!selectedCell) return;
+                const row = parseInt(selectedCell.dataset.row), col = parseInt(selectedCell.dataset.col);
+                if (!isMoveValid(currentGrid, row, col, num)) {
+                    selectedCell.classList.add("error-shake");
+                    setTimeout(() => selectedCell.classList.remove("error-shake"), 500);
+                    return;
+                }
+                currentGrid[row][col] = num;
+                selectedCell.textContent = num;
+                selectedCell.classList.add("user-filled");
+                
+                if (isTutorialActive) {
+                    tutorialStep++;
+                    runTutorialStep();
+                } else {
+                    updateHighlights(row, col, num, true);
+                    checkWinCondition();
+                }
+            }
+
+            function handleClearClick() {
+                if (!selectedCell || tutorialStep < tutorialSteps.length - 1) return;
+                const row = parseInt(selectedCell.dataset.row), col = parseInt(selectedCell.dataset.col);
+                if(originalGrid[row][col] === 0) {
+                    currentGrid[row][col] = 0;
+                    selectedCell.textContent = "";
+                    selectedCell.classList.remove("user-filled");
+                    updateHighlights(row, col, 0, true);
+                }
+            }
+
+            function checkWinCondition() {
+                if (currentGrid.some((row) => row.includes(0))) return;
+                const isCorrect = JSON.stringify(currentGrid) === JSON.stringify(solutionGrid);
+                if (isCorrect) {
+                    messageArea.textContent = "🎉 Congratulations! You solved it! 🎉";
+                    document.getElementById('hint-button').disabled = true;
+                    if (selectedCell) selectedCell.classList.remove("selected");
+                    selectedCell = null;
+                    updateHighlights(-1, -1, 0, false);
+                    numberPadElement.querySelectorAll("button").forEach((btn) => (btn.disabled = true));
+                } else {
+                    messageArea.textContent = "Something is not quite right... Keep trying!";
+                }
+            }
+
+            setupUIListeners();
+            newGame();
+        });
+    </script>
+</body>
+</html>

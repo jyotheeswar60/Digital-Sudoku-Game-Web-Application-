@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Level Hard 6</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-color: #121212;
+            --text-color: #e1e1e1;
+            --fixed-text-color: #ffffff;
+            --user-text-color: #64b5f6;
+            --grid-border-color: #3A3A3C;
+            --grid-thick-border-color: #9e9e9e;
+            --selected-cell-bg: #2c3e50;
+            --error-cell-bg: #CF6679;
+            --button-bg: #1e1e1e;
+            --button-hover-bg: #2C2C2E;
+            --modal-bg: rgba(30, 30, 30, 0.95);
+            --square-animation-color: rgba(255, 255, 255, 0.05); /* Animation Color */
+        }
+        .light-mode {
+            --bg-color: #ffffff;
+            --text-color: #212121;
+            --fixed-text-color: #000000;
+            --user-text-color: #1976d2;
+            --grid-border-color: #D1D1D6;
+            --grid-thick-border-color: #333333;
+            --selected-cell-bg: #bbdefb;
+            --button-bg: #f5f5f5;
+            --button-hover-bg: #e0e0e0;
+            --modal-bg: rgba(245, 245, 245, 0.95);
+            --square-animation-color: rgba(0, 0, 0, 0.05); /* Animation Color */
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: grid; 
+            place-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+            box-sizing: border-box;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            overflow: hidden; /* Added for animation */
+        }
+        .game-container { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+        .game-container h1 { font-size: 2.2rem; font-weight: 700; color: var(--fixed-text-color); margin-bottom: 0.5rem; text-align: center; }
+        
+        #sudoku-grid {
+            display: grid; 
+            grid-template-columns: repeat(16, clamp(22px, 3.5vw, 35px)); 
+            grid-template-rows: repeat(16, clamp(22px, 3.5vw, 35px)); 
+            border: 3px solid var(--grid-thick-border-color); 
+            border-radius: 8px; 
+            overflow: hidden; 
+        }
+
+        .sudoku-cell { display: flex; align-items: center; justify-content: center; font-size: clamp(0.6rem, 1.5vw, 1rem); font-weight: 600; border: 1px solid var(--grid-border-color); cursor: pointer; user-select: none; }
+        .col-border { border-right: 3px solid var(--grid-thick-border-color); }
+        .row-border { border-bottom: 3px solid var(--grid-thick-border-color); }
+        .sudoku-cell.fixed { color: var(--fixed-text-color); cursor: default; pointer-events: none; }
+        .sudoku-cell.user-filled { color: var(--user-text-color); font-weight: 700; }
+        .sudoku-cell.selected { background-color: var(--selected-cell-bg) !important; }
+        .sudoku-cell.error-shake { animation: shake 0.5s; background-color: var(--error-cell-bg); }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        
+        #controls-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+        #number-pad { 
+            display: grid; 
+            grid-template-columns: repeat(8, 1fr); 
+            gap: 0.5rem; 
+        }
+        #clear-pad {
+            display: flex;
+            justify-content: center;
+        }
+        .number-pad-button { 
+            width: clamp(35px, 6vw, 45px); 
+            height: clamp(35px, 6vw, 45px); 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            cursor: pointer; 
+            border-radius: 8px; 
+            border: none; 
+            background-color: var(--button-bg); 
+            color: var(--text-color); 
+            transition: background-color 0.2s ease; 
+        }
+        .number-pad-button:hover { background-color: var(--button-hover-bg); }
+        .number-pad-button.clear-btn { color: var(--error-cell-bg); width: clamp(40px, 8vw, 55px); }
+        
+        #message-area { font-weight: bold; height: 24px; font-size: 1.2rem; order: -1; }
+        .ui-buttons { position: fixed; top: 1rem; right: 1rem; z-index: 50; display: flex; gap: 0.5rem; }
+        .ui-button { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; border-radius: 50%; cursor: pointer; border: 1px solid var(--grid-border-color); background-color: var(--button-bg); color: var(--text-color); }
+        #back-button { position: fixed; top: 1rem; left: 1rem; z-index: 50; }
+        .hidden { display: none; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); display: grid; place-items: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .modal-overlay.visible { opacity: 1; pointer-events: auto; }
+        .modal-content { background-color: var(--modal-bg); backdrop-filter: blur(10px); padding: 2rem; border-radius: 16px; width: 90%; max-width: 500px; border: 1px solid var(--grid-border-color); position: relative; }
+        .modal-content h2 { font-size: 1.75rem; font-weight: 700; color: var(--fixed-text-color); margin: 0 0 1.5rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid var(--grid-thick-border-color); }
+        .modal-content li { margin-bottom: 1rem; }
+        .modal-content strong { display: block; font-size: 1.1rem; margin-bottom: 0.25rem; }
+        .close-modal { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 2rem; line-height: 1; cursor: pointer; color: var(--text-color); }
+        
+        /* --- START: Background Animation Styles --- */
+        .squares {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+        .squares li {
+            position: absolute;
+            display: block;
+            list-style: none;
+            width: 20px;
+            height: 20px;
+            background: var(--square-animation-color);
+            animation: animate 25s linear infinite;
+            bottom: -150px;
+            border-radius: 8px;
+        }
+        @keyframes animate {
+            0% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-120vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+        .squares li:nth-child(1) { left: 25%; width: 80px; height: 80px; animation-delay: 0s; }
+        .squares li:nth-child(2) { left: 10%; width: 20px; height: 20px; animation-delay: 2s; animation-duration: 12s; }
+        .squares li:nth-child(3) { left: 70%; width: 20px; height: 20px; animation-delay: 4s; }
+        .squares li:nth-child(4) { left: 40%; width: 60px; height: 60px; animation-delay: 0s; animation-duration: 18s; }
+        .squares li:nth-child(5) { left: 65%; width: 20px; height: 20px; animation-delay: 0s; }
+        .squares li:nth-child(6) { left: 75%; width: 110px; height: 110px; animation-delay: 3s; }
+        .squares li:nth-child(7) { left: 35%; width: 150px; height: 150px; animation-delay: 7s; }
+        .squares li:nth-child(8) { left: 50%; width: 25px; height: 25px; animation-delay: 15s; animation-duration: 45s; }
+        .squares li:nth-child(9) { left: 20%; width: 15px; height: 15px; animation-delay: 2s; animation-duration: 35s; }
+        .squares li:nth-child(10) { left: 85%; width: 150px; height: 150px; animation-delay: 0s; animation-duration: 11s; }
+        /* --- END: Background Animation Styles --- */
+    </style>
+</head>
+<body>
+    <ul class="squares" aria-hidden="true">
+        <li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li><li></li>
+    </ul>
+    <button id="back-button" class="ui-button" aria-label="Go back" title="Go back">
+        <svg style="width:1.5rem; height:1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+    </button>
+    <div class="ui-buttons">
+        <button id="new-game-button" class="ui-button" title="Start a new game"><svg style="width:1.5rem; height:1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-11.664 0l4.992-4.992m-4.993 0l3.181 3.183M3.75 12h16.5m-16.5 0l4.992 4.992" /></svg></button>
+        <button id="rules-button" class="ui-button" title="Show rules"><svg style="width:1.5rem; height:1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg></button>
+        <button id="theme-toggle" class="ui-button" title="Toggle theme"><svg id="sun-icon" class="hidden" style="width:1.5rem; height:1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg><svg id="moon-icon" class="hidden" style="width:1.5rem; height:1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg></button>
+    </div>
+
+    <main>
+        <div class="game-container">
+            <h1 id="game-title"><span style="margin: left 60px;">Sudoku</span><br>Hard Level -6</h1>
+            <div id="message-area" role="status" aria-live="polite"></div>
+            <div id="sudoku-grid" aria-label="16 by 16 puzzle grid"></div>
+            <div id="controls-container" role="toolbar" aria-label="Number pad"></div>
+        </div>
+    </main>
+    
+    <div id="rules-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="close-rules-modal" class="close-modal">&times;</button>
+            <h2>16x16 Rules</h2>
+            <ul style="padding-left: 1.25rem;">
+                <li><strong>Symbols:</strong> This puzzle uses numbers 1 through 16.</li>
+                <li><strong>Row Rule:</strong> Each row must contain every number from 1 to 16 exactly once.</li>
+                <li><strong>Column Rule:</strong> Each column must also contain every number from 1 to 16 exactly once.</li>
+                <li><strong>Region Rule:</strong> Each of the sixteen 4x4 square regions must contain every number from 1 to 16 exactly once.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        'use strict';
+        document.addEventListener('DOMContentLoaded', () => {
+            const themeToggle = document.getElementById('theme-toggle');
+            const sunIcon = document.getElementById('sun-icon');
+            const moonIcon = document.getElementById('moon-icon');
+            const body = document.body;
+            const rulesButton = document.getElementById('rules-button');
+            const rulesModal = document.getElementById('rules-modal');
+            const closeRulesModal = document.getElementById('close-rules-modal');
+            const backButton = document.getElementById('back-button');
+            const newGameButton = document.getElementById('new-game-button');
+
+            const applyTheme = (theme) => {
+                body.classList.toggle('light-mode', theme === 'light');
+                sunIcon.classList.toggle('hidden', theme === 'dark');
+                moonIcon.classList.toggle('hidden', theme === 'light');
+            };
+            themeToggle.addEventListener('click', () => applyTheme(body.classList.contains('light-mode') ? 'dark' : 'light'));
+            rulesButton.addEventListener('click', () => rulesModal.classList.add('visible'));
+            closeRulesModal.addEventListener('click', () => rulesModal.classList.remove('visible'));
+            applyTheme(window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            backButton.addEventListener('click', () => window.history.back());
+
+            const gridElement = document.getElementById('sudoku-grid');
+            const controlsContainer = document.getElementById('controls-container');
+            const messageArea = document.getElementById('message-area');
+            
+            const GRID_SIZE = 16;
+            const EMPTY_CELL = null;
+            const SYMBOLS = Array.from({length: 16}, (_, i) => String(i + 1));
+            let currentGrid = [], originalGrid = [], solutionGrid = [];
+            let selectedCell = null;
+            
+            const deepCopyGrid = (g) => g.map(r => [...r]);
+            
+            const fixedPuzzle = [
+                [null, 15, null, null, 13, null, 7, 9, null, 1, null, 12, 11, null, null, null],
+                [null, null, 13, 9, null, null, null, null, 15, null, 3, 5, 1, null, null, null],
+                [null, null, null, null, null, 15, null, null, null, null, null, null, 13, 6, null, 10],
+                [1, null, null, 11, 3, 10, null, 12, null, null, null, 14, null, null, null, null],
+                [15, null, null, null, 11, 1, null, null, null, 14, null, 13, 8, null, 10, null],
+                [null, null, 12, 8, null, null, 9, null, 2, 5, null, null, 16, null, null, null],
+                [null, 10, 7, null, null, null, null, 3, null, 11, null, null, null, null, null, 1],
+                [null, null, null, 2, null, null, null, null, null, null, 16, null, null, 15, 9, 12],
+                [11, 14, 2, null, null, 16, null, null, null, null, null, null, 7, null, null, null],
+                [8, null, null, null, null, null, 14, null, 6, null, null, null, null, 10, 2, null],
+                [null, null, null, null, 10, 4, null, 1, null, 2, null, null, 12, 13, null, null],
+                [null, 1, null, 10, 12, null, 13, null, null, null, 15, 8, null, null, null, 5],
+                [null, null, null, null, 9, null, null, 11, 14, null, null, 15, 10, null, null, 2],
+                [13, null, 1, 15, null, null, null, null, null, null, 12, null, null, null, null, null],
+                [null, null, null, 12, 1, 11, null, 10, null, null, null, null, 9, 8, null, null],
+                [null, null, null, 14, 16, null, 8, null, 13, 10, null, 6, null, null, 1, null]
+            ];
+            
+            const fixedSolution = [
+                [10, 15, 16, 5, 13, 14, 7, 9, 4, 1, 6, 12, 11, 2, 8, 3],
+                [14, 12, 13, 9, 2, 6, 10, 16, 15, 8, 3, 5, 1, 7, 4, 11],
+                [2, 7, 8, 4, 1, 15, 5, 11, 12, 9, 14, 10, 13, 6, 16, 9],
+                [1, 6, 3, 11, 3, 10, 4, 12, 16, 7, 8, 2, 5, 14, 15, 13],
+                [15, 2, 5, 6, 11, 1, 16, 14, 3, 14, 9, 13, 8, 4, 10, 7],
+                [13, 4, 12, 8, 7, 13, 9, 10, 2, 5, 1, 11, 16, 3, 12, 6],
+                [9, 10, 7, 16, 8, 5, 6, 3, 13, 11, 12, 4, 2, 9, 14, 1],
+                [16, 11, 1, 2, 4, 9, 12, 14, 10, 6, 16, 7, 3, 15, 9, 12],
+                [11, 14, 2, 1, 5, 16, 3, 8, 10, 13, 4, 9, 7, 12, 6, 15],
+                [8, 5, 15, 7, 14, 12, 14, 4, 6, 3, 1, 11, 13, 10, 2, 16],
+                [6, 16, 9, 3, 10, 4, 15, 1, 5, 2, 7, 16, 12, 13, 11, 8],
+                [4, 1, 10, 13, 12, 2, 13, 7, 9, 16, 15, 8, 14, 11, 3, 5],
+                [12, 3, 6, 1, 9, 7, 2, 11, 14, 4, 13, 15, 10, 16, 5, 2],
+                [13, 9, 1, 15, 6, 8, 11, 5, 7, 1, 12, 3, 4, 10, 13, 14],
+                [5, 13, 14, 12, 1, 11, 1, 10, 1, 15, 2, 1, 9, 8, 7, 4],
+                [7, 8, 4, 14, 16, 3, 8, 2, 13, 10, 9, 6, 15, 5, 1, 12]
+            ];
+            
+            function newGame() {
+                messageArea.textContent = '';
+                selectedCell = null;
+                gridElement.style.pointerEvents = 'auto';
+                controlsContainer.style.pointerEvents = 'auto';
+                originalGrid = deepCopyGrid(fixedPuzzle);
+                currentGrid = deepCopyGrid(fixedPuzzle);
+                solutionGrid = deepCopyGrid(fixedSolution);
+                renderGrid();
+                if (controlsContainer.innerHTML === "") renderNumberPad();
+            }
+
+            function isMoveValid(grid, row, col, val) {
+                val = parseInt(val);
+                for (let i = 0; i < GRID_SIZE; i++) {
+                    if (grid[row][i] === val) return false;
+                    if (grid[i][col] === val) return false;
+                }
+                const regionRowStart = Math.floor(row / 4) * 4;
+                const regionColStart = Math.floor(col / 4) * 4;
+                for (let r = 0; r < 4; r++) {
+                    for (let c = 0; c < 4; c++) {
+                        if (grid[regionRowStart + r][regionColStart + c] === val) return false;
+                    }
+                }
+                return true;
+            }
+
+            function renderGrid() {
+                gridElement.innerHTML = '';
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'sudoku-cell';
+                        cell.dataset.row = r; cell.dataset.col = c;
+                        if (c === 3 || c === 7 || c === 11) cell.classList.add('col-border');
+                        if (r === 3 || r === 7 || r === 11) cell.classList.add('row-border');
+                        const value = currentGrid[r][c];
+                        if (value !== EMPTY_CELL) {
+                            cell.textContent = value;
+                            cell.classList.add(originalGrid[r][c] !== EMPTY_CELL ? 'fixed' : 'user-filled');
+                        } else {
+                            cell.addEventListener('click', () => handleCellClick(cell));
+                        }
+                        gridElement.appendChild(cell);
+                    }
+                }
+            }
+            
+            function renderNumberPad() {
+                controlsContainer.innerHTML = '';
+                const numberPad = document.createElement('div');
+                numberPad.id = 'number-pad';
+                
+                SYMBOLS.forEach(symbol => {
+                    const button = document.createElement('button');
+                    button.className = 'number-pad-button';
+                    button.textContent = symbol;
+                    button.addEventListener('click', () => handleNumberClick(symbol));
+                    numberPad.appendChild(button);
+                });
+
+                const clearPad = document.createElement('div');
+                clearPad.id = 'clear-pad';
+                const clearButton = document.createElement('button');
+                clearButton.className = 'number-pad-button clear-btn';
+                clearButton.textContent = 'X';
+                clearButton.addEventListener('click', handleClearClick);
+                clearPad.appendChild(clearButton);
+
+                controlsContainer.appendChild(numberPad);
+                controlsContainer.appendChild(clearPad);
+            }
+            
+            function handleCellClick(cell) {
+                if (selectedCell) selectedCell.classList.remove('selected');
+                selectedCell = (selectedCell === cell) ? null : cell;
+                if (selectedCell) selectedCell.classList.add('selected');
+            }
+
+            function handleNumberClick(val) {
+                if (!selectedCell) return;
+                const row = parseInt(selectedCell.dataset.row);
+                const col = parseInt(selectedCell.dataset.col);
+                const numVal = parseInt(val);
+                const tempGrid = deepCopyGrid(currentGrid);
+                tempGrid[row][col] = EMPTY_CELL;
+
+                if (!isMoveValid(tempGrid, row, col, numVal)) {
+                    selectedCell.classList.add('error-shake');
+                    setTimeout(() => selectedCell.classList.remove('error-shake'), 500);
+                    return;
+                }
+                currentGrid[row][col] = numVal;
+                selectedCell.textContent = val;
+                selectedCell.classList.add('user-filled');
+                checkWinCondition();
+            }
+
+            function handleClearClick() {
+                if (!selectedCell) return;
+                const row = parseInt(selectedCell.dataset.row);
+                const col = parseInt(selectedCell.dataset.col);
+                if (originalGrid[row][col] === EMPTY_CELL) {
+                    currentGrid[row][col] = EMPTY_CELL;
+                    selectedCell.textContent = '';
+                    selectedCell.classList.remove('user-filled');
+                }
+            }
+
+            function checkWinCondition() {
+                if (currentGrid.some(row => row.includes(EMPTY_CELL))) return;
+                
+                const isSolved = JSON.stringify(currentGrid) === JSON.stringify(solutionGrid);
+                if (isSolved) {
+                    messageArea.textContent = 'Congratulations! You solved it!';
+                    gridElement.style.pointerEvents = 'none';
+                    controlsContainer.style.pointerEvents = 'none';
+                } else {
+                    messageArea.textContent = 'Puzzle Filled, but not correct!';
+                }
+            }
+
+            newGameButton.addEventListener('click', newGame);
+            newGame();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sudoku - Voice Tutorial</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --bg-color: #121212;
+            --text-color: #e1e1e1;
+            --fixed-text-color: #ffffff;
+            --user-text-color: #64b5f6;
+            --hinted-text-color: #81c784;
+            --grid-border-color: #3a3a3c;
+            --grid-thick-border-color: #9e9e9e;
+            --selected-cell-bg: #2c3e50;
+            --tutorial-highlight-bg: rgba(255, 255, 0, 0.25);
+            --error-cell-bg: #cf6679;
+            --button-bg: #1e1e1e;
+            --button-hover-bg: #2c2c2e;
+        }
+        .light-mode {
+            --bg-color: #ffffff;
+            --text-color: #212121;
+            --fixed-text-color: #000000;
+            --user-text-color: #1976d2;
+            --hinted-text-color: #2e7d32;
+            --grid-border-color: #d1d1d6;
+            --grid-thick-border-color: #333333;
+            --selected-cell-bg: #bbdefb;
+            --tutorial-highlight-bg: rgba(255, 255, 0, 0.25);
+            --error-cell-bg: #e57373;
+            --button-bg: #f5f5f5;
+            --button-hover-bg: #e0e0e0;
+        }
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 1rem;
+        }
+        .game-container { display: flex; flex-direction: row; align-items: center; gap: 2rem; width: 100%; justify-content: center; }
+        .layout-spacer { width: 300px; flex-shrink: 0; visibility: hidden; }
+        .game-board-and-controls { display: flex; flex-direction: column; align-items: center; gap: 1.5rem; flex-shrink: 0; }
+        #message-area { font-weight: bold; font-size: 1.3rem; line-height: 1.6; text-align: left; width: 300px; flex-shrink: 0; padding: 1.5rem; border-radius: 8px; background-color: var(--button-bg); border: 1px solid var(--grid-border-color); }
+        h1 { font-size: 2.5rem; font-weight: 700; color: var(--text-color); margin-bottom: 0; text-align: center; }
+        
+        .sudoku-grid { display: grid; grid-template-columns: repeat(9, clamp(35px, 5vw, 50px)); grid-template-rows: repeat(9, clamp(35px, 5vw, 50px)); border: 3px solid var(--grid-thick-border-color); border-radius: 8px; overflow: hidden; }
+        .sudoku-cell { position: relative; display: flex; align-items: center; justify-content: center; font-size: clamp(1.2rem, 2.5vw, 1.7rem); font-weight: 600; border: 1px solid var(--grid-border-color); cursor: pointer; user-select: none; }
+        .sudoku-cell::before { content: attr(data-label); position: absolute; top: 1px; left: 2px; font-size: 0.5rem; font-weight: 400; color: #9ca3af; }
+        .sudoku-cell:nth-child(3n) { border-right: 2px solid var(--grid-thick-border-color); }
+        .sudoku-cell:nth-child(9n) { border-right: none; }
+        .row-border { border-bottom: 2px solid var(--grid-thick-border-color); }
+        
+        .sudoku-cell.fixed { color: var(--fixed-text-color); cursor: default; }
+        .sudoku-cell.fixed::before { display: none; }
+        .sudoku-cell.user-filled { color: var(--user-text-color); font-weight: 700; }
+        .sudoku-cell.hinted { color: var(--hinted-text-color); font-weight: 700; }
+        .sudoku-cell.selected { background-color: var(--selected-cell-bg) !important; }
+        .sudoku-cell.tutorial-highlight { background-color: var(--tutorial-highlight-bg); }
+        .sudoku-cell.error-shake { animation: shake 0.5s; background-color: var(--error-cell-bg); }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+        #voice-command-button { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 0.75rem 1.5rem; font-size: 1.1rem; font-weight: 700; border-radius: 0.75rem; border: none; cursor: pointer; transition: all 0.3s ease; }
+        #voice-command-button:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(99, 102, 241, 0.4); }
+        #voice-command-button.listening { background: linear-gradient(135deg, #8b5cf6, #d946ef); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+        .ui-buttons { position: fixed; top: 1rem; right: 1rem; z-index: 50; display: flex; gap: 0.5rem; }
+        .ui-button { display: flex; align-items: center; justify-content: center; width: 3rem; height: 3rem; border-radius: 50%; cursor: pointer; border: 1px solid var(--grid-border-color); background-color: var(--button-bg); color: var(--text-color); }
+        #back-button { position: fixed; top: 1rem; left: 1rem; z-index: 50; }
+        .hidden { display: none; }
+
+        @media (max-width: 1024px) {
+            .game-container { flex-direction: column; gap: 1.5rem; }
+            .layout-spacer { display: none; }
+            #message-area { width: 100%; max-width: 500px; order: -1; text-align: center; min-height: 48px; }
+        }
+    </style>
+</head>
+<body>
+    <button id="back-button" class="ui-button" aria-label="Go back" title="Go back">
+        <svg style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+    </button>
+    <div class="ui-buttons">
+        <button id="theme-toggle" class="ui-button" aria-label="Toggle theme" title="Toggle theme">
+            <svg id="sun-icon" class="hidden" style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            <svg id="moon-icon" class="hidden" style="width: 1.5rem; height: 1.5rem" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+        </button>
+    </div>
+
+    <main>
+        <div class="game-container" role="application">
+            <div class="layout-spacer"></div>
+            <div class="game-board-and-controls">
+                <h1 id="game-title">Sudoku<br><b>Voice Tutorial</b></h1>
+                <div id="sudoku-grid" class="sudoku-grid" aria-label="9 by 9 puzzle grid"></div>
+                <button id="voice-command-button">Start Tutorial</button>
+            </div>
+            <div id="message-area" role="status" aria-live="polite"></div>
+        </div>
+    </main>
+
+    <script>
+        "use strict";
+        document.addEventListener("DOMContentLoaded", () => {
+            const body = document.body;
+            const gridElement = document.getElementById("sudoku-grid");
+            const messageArea = document.getElementById("message-area");
+            const voiceButton = document.getElementById("voice-command-button");
+            
+            const GRID_SIZE = 9;
+            let currentGrid = [], originalGrid = [];
+            let selectedCell = null;
+            let labelToCellMap = {};
+            let tutorialStep = 0;
+
+            const tutorialSteps = [
+                { 
+                    message: "Welcome! Let's find our first number. In the top-left box, the only place for a 4 is cell A1. Click the voice button and say 'Alpha 1'.",
+                    highlight: { type: 'box', row: 0, col: 0 },
+                    action: { type: 'voice-cell', label: 'A1' }
+                },
+                { 
+                    message: "Excellent! Now, to place the number, click the voice button again and say 'Four'.",
+                    highlight: {},
+                    action: { type: 'voice-number', number: 4 }
+                },
+                { 
+                    message: "Great! Let's try another one. Look at the middle row. It's missing a 6. Select the empty cell by clicking the voice button and saying 'Echo 5'.",
+                    highlight: { type: 'row', row: 4 },
+                    action: { type: 'voice-cell', label: 'E5' }
+                },
+                { 
+                    message: "Perfect. Now place the missing number. Click the voice button and say 'Six'.",
+                    highlight: {},
+                    action: { type: 'voice-number', number: 6 }
+                },
+                { 
+                    message: "You've learned the basics! The tutorial is now complete. You can solve the rest of the puzzle using voice commands. Good luck!",
+                    highlight: {},
+                    action: { type: 'end' }
+                }
+            ];
+
+            const fixedPuzzle = [
+                [0, 0, 3, 0, 2, 0, 6, 0, 0],[9, 0, 0, 3, 0, 5, 0, 0, 1],[0, 0, 1, 8, 0, 6, 4, 0, 0],
+                [0, 0, 8, 1, 0, 2, 9, 0, 0],[7, 0, 0, 0, 0, 0, 0, 0, 8],[0, 0, 6, 7, 0, 8, 2, 0, 0],
+                [0, 0, 2, 6, 0, 9, 5, 0, 0],[8, 0, 0, 2, 0, 3, 0, 0, 9],[0, 0, 5, 0, 1, 0, 3, 0, 0]
+            ];
+            
+            const deepCopyGrid = (g) => g.map((r) => [...r]);
+
+            function setupUIListeners() {
+                const ui = { themeToggle: document.getElementById("theme-toggle"), sunIcon: document.getElementById("sun-icon"), moonIcon: document.getElementById("moon-icon"), backButton: document.getElementById("back-button") };
+                const applyTheme = (theme) => { body.classList.toggle("light-mode", theme === "light"); ui.sunIcon.classList.toggle("hidden", theme === "dark"); ui.moonIcon.classList.toggle("hidden", theme === "light"); };
+                ui.themeToggle.addEventListener("click", () => applyTheme(body.classList.contains("light-mode") ? "dark" : "light"));
+                applyTheme(window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+                ui.backButton.addEventListener("click", () => window.history.back());
+            }
+
+            function newGame() {
+                messageArea.textContent = "";
+                selectedCell = null;
+                tutorialStep = 0;
+                originalGrid = deepCopyGrid(fixedPuzzle);
+                currentGrid = deepCopyGrid(fixedPuzzle);
+                renderGrid();
+                runTutorialStep();
+            }
+
+            function runTutorialStep() {
+                const step = tutorialSteps[tutorialStep];
+                messageArea.textContent = step.message;
+                speak(step.message);
+                document.querySelectorAll(".sudoku-cell").forEach(c => c.classList.remove("tutorial-highlight"));
+                
+                if (step.highlight.type === 'box') {
+                    const { row, col } = step.highlight;
+                    const boxRowStart = Math.floor(row / 3) * 3, boxColStart = Math.floor(col / 3) * 3;
+                    for (let r_offset = 0; r_offset < 3; r_offset++) {
+                        for (let c_offset = 0; c_offset < 3; c_offset++) {
+                            gridElement.querySelector(`[data-row='${boxRowStart + r_offset}'][data-col='${boxColStart + c_offset}']`).classList.add('tutorial-highlight');
+                        }
+                    }
+                } else if (step.highlight.type === 'row') {
+                     for (let c = 0; c < GRID_SIZE; c++) {
+                        gridElement.querySelector(`[data-row='${step.highlight.row}'][data-col='${c}']`).classList.add('tutorial-highlight');
+                    }
+                } else if (step.action.type === 'end') {
+                    voiceButton.textContent = "Start Voice Command";
+                }
+            }
+            
+            function generateLabel(row, col) {
+                const rowChar = String.fromCharCode(65 + row);
+                const colNum = col + 1;
+                return rowChar + colNum;
+            }
+
+            function renderGrid() {
+                gridElement.innerHTML = "";
+                labelToCellMap = {};
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        const cell = document.createElement("div");
+                        cell.className = "sudoku-cell";
+                        cell.dataset.row = r; cell.dataset.col = c;
+                        if (r === 2 || r === 5) cell.classList.add("row-border");
+                        const value = currentGrid[r][c];
+                        const label = generateLabel(r, c);
+                        cell.dataset.label = label;
+                        labelToCellMap[label] = { r, c, element: cell };
+                        
+                        if (value !== 0) {
+                            cell.textContent = value;
+                            cell.classList.add(originalGrid[r][c] !== 0 ? "fixed" : "user-filled");
+                        }
+                        cell.addEventListener("click", () => handleCellClick(cell));
+                        
+                        // --- FIX: This line was missing ---
+                        gridElement.appendChild(cell);
+                    }
+                }
+            }
+
+            function handleCellClick(cell) {
+                if (selectedCell) selectedCell.classList.remove("selected");
+                selectedCell = (selectedCell === cell) ? null : cell;
+                if (selectedCell) selectedCell.classList.add("selected");
+            }
+
+            function placeNumber(num) {
+              if (!selectedCell || selectedCell.classList.contains('fixed')) return false;
+              const row = parseInt(selectedCell.dataset.row), col = parseInt(selectedCell.dataset.col);
+              currentGrid[row][col] = num;
+              renderGrid();
+              return true;
+            }
+            
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                voiceButton.disabled = true;
+                voiceButton.textContent = "Voice Not Supported";
+            } else {
+                const recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.lang = 'en-US';
+                let voiceState = 'idle';
+
+                const speak = (text, callback) => {
+                    speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    if(callback) utterance.onend = callback;
+                    speechSynthesis.speak(utterance);
+                };
+
+                const startListening = () => {
+                    voiceState = 'listening';
+                    voiceButton.classList.add('listening');
+                    voiceButton.textContent = "Listening...";
+                    try { recognition.start(); } 
+                    catch(e) { 
+                        voiceButton.classList.remove('listening');
+                        voiceButton.textContent = "Start Voice Command";
+                        voiceState = 'idle';
+                    }
+                };
+                
+                voiceButton.addEventListener('click', () => {
+                    if (voiceState !== 'idle') return;
+                    startListening();
+                });
+                
+                const natoPhonetic = {'ALPHA':'A', 'BRAVO':'B', 'CHARLIE':'C', 'DELTA':'D', 'ECHO':'E', 'FOXTROT':'F', 'GOLF':'G', 'HOTEL':'H', 'INDIA':'I'};
+                const valueMap = { "ONE":1, "TWO":2, "TO":2, "THREE":3, "FOUR":4, "FOR":4, "FIVE":5, "SIX":6, "SEVEN":7, "EIGHT":8, "ATE":8, "NINE":9 };
+
+                const parseCellCommand = (transcript) => {
+                    const cleaned = transcript.toUpperCase().replace(/\s+/g, '');
+                    if (labelToCellMap[cleaned]) return cleaned;
+                    const words = transcript.toUpperCase().split(/\s+/);
+                    let foundLetter = null, foundNumber = null;
+                    for (const word of words) {
+                        if (!foundLetter && (natoPhonetic[word] || (word.length === 1 && word >= 'A' && word <= 'I'))) {
+                            foundLetter = natoPhonetic[word] || word;
+                        }
+                        const num = valueMap[word] || parseInt(word);
+                        if (!foundNumber && num >= 1 && num <= 9) { foundNumber = num; }
+                    }
+                    if(foundLetter && foundNumber) {
+                        const label = foundLetter + foundNumber;
+                        return labelToCellMap[label] ? label : null;
+                    }
+                    return null;
+                };
+
+                const parseValueCommand = (transcript) => {
+                    const words = transcript.toUpperCase().split(' ');
+                    for (const word of words) {
+                        if (valueMap[word]) return valueMap[word];
+                        const num = parseInt(word);
+                        if (!isNaN(num) && num >= 1 && num <= 9) return num;
+                    }
+                    return null;
+                };
+                
+                recognition.onresult = (event) => {
+                    let transcript = event.results[0][0].transcript.trim();
+                    const isTutorialActive = tutorialStep < tutorialSteps.length - 1;
+
+                    if (isTutorialActive) {
+                        const currentStep = tutorialSteps[tutorialStep];
+                        if (currentStep.action.type === 'voice-cell') {
+                            const spokenLabel = parseCellCommand(transcript);
+                            if (spokenLabel === currentStep.action.label) {
+                                handleCellClick(labelToCellMap[spokenLabel].element);
+                                tutorialStep++;
+                                setTimeout(runTutorialStep, 500);
+                            } else {
+                                speak("Not quite. Please try saying the correct cell: " + currentStep.action.label.split('').join(' '));
+                            }
+                        } else if (currentStep.action.type === 'voice-number') {
+                            const spokenNumber = parseValueCommand(transcript);
+                            if (spokenNumber === currentStep.action.number) {
+                                placeNumber(spokenNumber);
+                                handleCellClick(selectedCell);
+                                tutorialStep++;
+                                setTimeout(runTutorialStep, 500);
+                            } else {
+                                speak("That's not the right number for this step. Please try again.");
+                            }
+                        }
+                    } else {
+                        if (!selectedCell) {
+                             const cellLabel = parseCellCommand(transcript);
+                            if (cellLabel) {
+                                handleCellClick(labelToCellMap[cellLabel].element);
+                                speak(`Cell ${cellLabel} selected.`);
+                            } else {
+                                speak("I didn't catch that cell. Please try again.");
+                            }
+                        } else {
+                            const num = parseValueCommand(transcript);
+                            if (num) {
+                                if (placeNumber(num)) {
+                                    speak(`Placed ${num}.`);
+                                } else {
+                                     speak(`${num} is not a valid move here.`);
+                                }
+                            } else {
+                                speak("Please say a number from 1 to 9.");
+                            }
+                            handleCellClick(selectedCell);
+                        }
+                    }
+                };
+                
+                recognition.onend = () => {
+                    voiceButton.classList.remove('listening');
+                    const btnText = (tutorialStep < tutorialSteps.length - 1) ? "Start Tutorial Step" : "Start Voice Command";
+                    voiceButton.textContent = btnText;
+                    voiceState = 'idle'; 
+                };
+                recognition.onerror = (event) => {
+                    messageArea.textContent = 'Error: ' + event.error;
+                    recognition.onend();
+                };
+            }
+            setupUIListeners();
+            newGame();
+        });
+    </script>
+</body>
+</html>
