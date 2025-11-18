@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Digital Sudoku</title>
+    <title>Digital Sudoku (Client-Side Mock)</title>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
       rel="stylesheet"
@@ -30,6 +30,11 @@
       .light-mode {
         --bg-color: #ffffff;
         --text-color: #212121;
+        /* FIX: Card and Input colors for Light Mode */
+        --card-bg-color: rgba(255, 255, 255, 0.85); 
+        --input-bg-color: rgba(0, 0, 0, 0.05); 
+        --input-focus-bg: rgba(0, 0, 0, 0.1);
+        /* End FIX */
         --fixed-text-color: #000000;
         --user-text-color: #1976d2;
         --hinted-text-color: #2e7d32;
@@ -42,7 +47,6 @@
         --button-hover-bg: #e0e0e0;
         --square-animation-color: rgba(0, 0, 0, 0.05);
         --modal-bg: rgba(245, 245, 245, 0.95);
-        --input-bg-color: rgba(0, 0, 0, 0.05);
       }
 
       body {
@@ -59,6 +63,13 @@
       .app-view.active {
         display: flex;
       }
+      
+      /* FIX: Ensure this container takes up the full viewport height for centering */
+      .w-full.h-full.flex.items-center.justify-center {
+        min-height: 100vh; 
+        height: 100%;
+      }
+      /* End FIX */
 
       .squares {
         position: absolute;
@@ -579,16 +590,6 @@
           </button>
         </div>
 
-        <div class="mt-6 w-full max-w-lg mx-auto">
-          <h2 class="text-2xl font-bold mb-4 text-center">
-            Normal Leaderboard
-          </h2>
-          <ol
-            id="normal-leaderboard"
-            class="space-y-2 list-none p-0"
-          ></ol>
-        </div>
-
         <div class="mt-8 flex flex-col items-center">
           <button
             class="show-mode-select p-4 rounded-full bg-gray-600 hover:bg-gray-700 text-white shadow-lg transition"
@@ -647,16 +648,6 @@
           </button>
         </div>
 
-        <div class="mt-6 w-full max-w-lg mx-auto">
-          <h2 class="text-2xl font-bold mb-4 text-center">
-            Voice Leaderboard
-          </h2>
-          <ol
-            id="voice-leaderboard"
-            class="space-y-2 list-none p-0"
-          ></ol>
-        </div>
-
         <div class="mt-8 flex flex-col items-center">
           <button
             class="show-mode-select p-4 rounded-full bg-gray-600 hover:bg-gray-700 text-white shadow-lg transition"
@@ -683,7 +674,10 @@
         id="level-select-view"
         class="app-view w-full flex-col items-center justify-center text-center px-4"
       >
-        <h1 id="level-select-title" class="text-3xl sm:text-5xl font-extrabold mb-8">
+        <h1
+          id="level-select-title"
+          class="text-3xl sm:text-5xl font-extrabold mb-8"
+        >
           Select Level
         </h1>
         <div
@@ -747,7 +741,11 @@
           >
             User Profile
           </h1>
-          <p class="text-lg mb-8" style="color: var(--text-gray-color)" id="profile-email">
+          <p
+            class="text-lg mb-8"
+            style="color: var(--text-gray-color)"
+            id="profile-email"
+          >
             email@example.com
           </p>
           <div class="grid grid-cols-3 gap-4 text-center mb-10">
@@ -789,12 +787,44 @@
     </div>
 
     <script>
-      // --- MOCK USER STATS for Demonstration of 'Correct Mark' ---
-      // This array stores completed level IDs as strings: "mode_difficulty_levelNumber" (e.g., "normal_easy_3")
-      // In a real application, this data would come from your backend.
+      // --- LOCAL STORAGE DATA STRUCTURES ---
+      // 1. mockUsers: Stores user credentials and profile data for client-side login.
+      // We keep the structure to allow Signup/Logout to still function, but Login ignores it.
+      const getInitialMockUsers = () => {
+        const storedUsers = localStorage.getItem("mockUsers");
+        if (storedUsers) {
+          return JSON.parse(storedUsers);
+        }
+        // Keep "gani" as a default user, but it's ignored by the new login logic.
+        return {
+            "gani": { username: "gani", email: "gani@example.com", password: "password" }
+        };
+      };
+
+      let mockUsers = getInitialMockUsers();
+
+
+      // 2. sudokuUserStats: Stores all completed and dropped counts.
+      const initialUserStats = {
+        normal: { easy: { completed: 0, dropped: 0 }, medium: { completed: 0, dropped: 0 }, hard: { completed: 0, dropped: 0 }, training: { completed: 0, dropped: 0 } },
+        voice: { easy: { completed: 0, dropped: 0 }, medium: { completed: 0, dropped: 0 }, hard: { completed: 0, dropped: 0 }, training: { completed: 0, dropped: 0 } },
+      };
+      
+      let currentUserStats = JSON.parse(
+        localStorage.getItem("sudokuUserStats") || JSON.stringify(initialUserStats)
+      );
+
+      // 3. MOCK_COMPLETED_LEVELS: Stores individual level IDs for checkmarks
       const MOCK_COMPLETED_LEVELS = JSON.parse(
         localStorage.getItem("completedLevels") || "[]"
       );
+      
+      const saveMockUsers = () => localStorage.setItem("mockUsers", JSON.stringify(mockUsers));
+      const saveUserStats = () => localStorage.setItem("sudokuUserStats", JSON.stringify(currentUserStats));
+      const saveCompletedLevels = () => localStorage.setItem("completedLevels", JSON.stringify(MOCK_COMPLETED_LEVELS));
+
+
+      // --- MOCK GAME LOGIC (NO SERVER CONNECTION) ---
 
       // Function to check if a level is completed (for displaying the checkmark)
       const isLevelCompleted = (mode, difficulty, levelIndex) => {
@@ -803,146 +833,93 @@
         );
       };
 
-      // *** FIX IMPLEMENTED HERE ***
-      // Function to be called when a Sudoku is solved. 
-      // It updates local storage for the checkmark AND calls the server API.
-      const completeLevel = (mode, difficulty, levelIndex) => {
-        const levelID = `${mode}_${difficulty}_${levelIndex}`;
-        if (!MOCK_COMPLETED_LEVELS.includes(levelID)) {
-          MOCK_COMPLETED_LEVELS.push(levelID);
-          localStorage.setItem(
-            "completedLevels",
-            JSON.stringify(MOCK_COMPLETED_LEVELS)
-          );
-          
-          // CRITICAL FIX: Ensure the 'completed' status is sent to the server API
-          updateStatOnServer(mode, difficulty, 'completed'); 
-
-          console.log(`Level Completed: ${levelID}. Stats updated in localStorage and server.`);
+      // Updates client-side stats
+      const updateLocalStat = (mode, difficulty, status, levelIndex = null) => {
+        if (!currentUserStats[mode] || !currentUserStats[mode][difficulty]) {
+            console.error(`Invalid mode/difficulty: ${mode}/${difficulty}`);
+            return false;
         }
-      };
-      // -----------------------------------------------------------------
 
-      // --- PHP/Backend Functions (Signup, Login, Stats Placeholders) ---
+        // 1. Update overall completed list for checkmarks
+        if (status === 'completed' && levelIndex !== null) {
+            const levelID = `${mode}_${difficulty}_${levelIndex}`;
+            if (!MOCK_COMPLETED_LEVELS.includes(levelID)) {
+                MOCK_COMPLETED_LEVELS.push(levelID);
+                saveCompletedLevels();
+            }
+        }
+
+        // 2. Update the main counter object
+        if (status === 'completed') {
+            currentUserStats[mode][difficulty].completed += 1;
+        } else if (status === 'dropped') {
+            currentUserStats[mode][difficulty].dropped += 1;
+        }
+        
+        saveUserStats();
+        console.log(`Stat updated locally: ${mode}/${difficulty} -> ${status}.`);
+        return true;
+      };
+
+
+      // --- MOCK USER AUTHENTICATION FUNCTIONS (Login Bypass) ---
+
       function signupUser(username, email, password, confirmPassword) {
-        showMessage("", "info", 0); // Hide immediately
+        showMessage("", "info", 0); 
         if (password !== confirmPassword) {
           showMessage("Passwords do not match.", "error");
           return;
         }
-        fetch("api/signup.php", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: `username=${encodeURIComponent(username)}&email=${encodeURIComponent(
-            email
-          )}&password=${encodeURIComponent(password)}`,
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            showMessage(data.message, data.success ? "success" : "error");
-            if (data.success) {
-              document.getElementById("signup-form").reset();
-              setTimeout(() => {
-                document.querySelector("#signup-view .show-login-link").click();
-              }, 1500);
-            }
-          })
-          .catch((error) => {
-            console.error("Signup Error:", error);
-            showMessage("Error connecting to the server.", "error");
-          });
-      }
-      function loginUser(username, password, switchViewFn) {
-        showMessage("", "info", 0); // Hide immediately
-        fetch("api/login.php", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(
-            password
-          )}`,
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success && data.user) {
-              showMessage("Login successful! Redirecting...", "success", 2000);
-              localStorage.setItem(
-                "currentUser",
-                JSON.stringify({
-                  username: data.user.username,
-                  email: data.user.email,
-                })
-              );
-              sessionStorage.clear();
-              document.getElementById("login-form").reset();
-              setTimeout(() => {
-                switchViewFn("select-mode-view");
-              }, 1000);
-            } else {
-              const errorMsg = data.message || "Login failed. Please check credentials.";
-              showMessage(errorMsg, "error");
-            }
-          })
-          .catch((error) => {
-            console.error("Login Error:", error);
-            showMessage("Error connecting to the server.", "error");
-          });
+        if (mockUsers[username] || Object.values(mockUsers).some(user => user.email === email)) {
+            showMessage("Username or Email already exists.", "error");
+            return;
+        }
+
+        mockUsers[username] = { username, email, password };
+        saveMockUsers();
+        
+        showMessage("Account created successfully! Please log in.", "success");
+        document.getElementById("signup-form").reset();
+        setTimeout(() => {
+            document.querySelector("#signup-view .show-login-link").click();
+        }, 1500);
       }
 
-      // --- Updated Stats/Leaderboard Functions (Now REAL) ---
-      async function fetchStatsFromServer() {
-        try {
-          const response = await fetch("api/get_stats.php");
-          const data = await response.json();
-          if (data.success) {
-            return data.stats; // Returns the { normal: {...}, voice: {...} } object
-          } else {
-            console.error("fetchStatsFromServer error:", data.message);
-            // Return default structure on failure
-            return { normal: {}, voice: {} };
-          }
-        } catch (error) {
-          console.error("fetchStatsFromServer fetch error:", error);
-          return { normal: {}, voice: {} }; // Return default on network error
+      function loginUser(usernameOrEmail, password, switchViewFn) {
+        showMessage("", "info", 0); 
+        
+        // Check for empty fields first
+        if (!usernameOrEmail || !password) {
+            showMessage("Please enter both username/email and password.", "error");
+            return;
         }
-      }
-      // This function now needs the 'mode'
-      async function updateStatOnServer(mode, difficulty, status) {
-        try {
-          const response = await fetch("api/update_stats.php", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              mode: mode,
-              difficulty: difficulty,
-              status: status,
-              // levelIndex is not needed by the new PHP script, but you could send it
-            }),
-          });
-          const data = await response.json();
-          return data.success;
-        } catch (error) {
-          console.error("updateStatOnServer fetch error:", error);
-          return false;
-        }
+
+        // 🚨 FIX: LOGIN BYPASS IMPLEMENTATION 
+        // 1. Create a dummy user object using the input
+        const dummyUser = { 
+            username: usernameOrEmail.split('@')[0], 
+            email: usernameOrEmail.includes('@') ? usernameOrEmail : `${usernameOrEmail}@dummy.com`
+        };
+
+        // 2. Set the current user and proceed to log in
+        localStorage.setItem("currentUser", JSON.stringify(dummyUser));
+        sessionStorage.clear();
+        document.getElementById("login-form").reset();
+        
+        showMessage("Login successful! Redirecting...", "success", 2000);
+        
+        setTimeout(() => {
+            switchViewFn("select-mode-view");
+        }, 1000);
+        
+        // End FIX
       }
 
-      async function fetchLeaderboards(mode) {
-        try {
-          // Fetch the specific leaderboard
-          const response = await fetch(`api/get_leaderboard.php?mode=${mode}`);
-          const data = await response.json();
-          if (data.success) {
-            return data.leaderboard; // Returns the array: [{rank: 1, ...}, ...]
-          } else {
-            console.error(`fetchLeaderboards (${mode}) error:`, data.message);
-            return []; // Return empty array on failure
-          }
-        } catch (error) {
-          console.error(`fetchLeaderboards (${mode}) fetch error:`, error);
-          return []; // Return empty array on network error
-        }
+      function forgotPassword(email) {
+        // Pure simulation
+        showMessage("Password reset link sent to " + email + " (simulation)!", "success");
       }
-      // --- End Stats/Leaderboard Functions ---
+      // --- End MOCK User Auth Functions ---
 
       // --- Message Display Function ---
       let messageTimeout;
@@ -951,7 +928,7 @@
         const messageText = document.getElementById("message-text");
         clearTimeout(messageTimeout);
         messageText.textContent = text;
-        messageBox.className = "message-box"; // Reset classes
+        messageBox.className = "message-box"; 
         if (text) {
           if (type === "success") messageBox.classList.add("bg-success");
           else if (type === "error") messageBox.classList.add("bg-error");
@@ -1007,13 +984,11 @@
             "light");
         applyTheme(sT);
 
-        // --- View Switching Logic (FIXED: Correctly tracks previous view) ---
+        // --- View Switching Logic ---
         let previousView = "login-view";
         const switchView = (vId) => {
           const aV = document.querySelector(".app-view.active");
           
-          // Check if a view is currently active AND that view is NOT the Profile view.
-          // The current active view should be saved as 'previousView'.
           if (aV && aV.id !== "profile-view") {
               previousView = aV.id;
           }
@@ -1026,9 +1001,9 @@
           }
         };
 
-        // --- Level Selection Logic (Updated) ---
+        // --- Level Selection Constants and Logic ---
         const LEVEL_COUNTS = {
-          // The base counts, including the training levels (used for the total levels per difficulty list)
+          // Total number of levels available per difficulty/mode
           normal: {
             easy: 25,
             medium: 25,
@@ -1043,7 +1018,7 @@
           },
         };
         
-        // List of difficulty keys to include in the overall Total Levels (Excludes 'training')
+        // Keys to count toward the total (excluding single training levels)
         const DIFFICULTY_KEYS_FOR_TOTALS = ["easy", "medium", "hard"];
 
 
@@ -1064,26 +1039,25 @@
 
             const btn = document.createElement("button");
             // Add checkmark if completed
-            btn.innerHTML = isCompleted ? `✅ ${i}` : `${i}`; 
+            btn.innerHTML = isCompleted ? `<span style="position: absolute; top: 2px; right: 2px; font-size: 1.2rem;">✅</span>${i}` : `${i}`; 
 
             btn.className =
               "w-16 h-16 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xl shadow-lg transition flex items-center justify-center relative";
 
-            // Determine the correct file name
+            // Determine the file name (you'll need these files for the game to start)
             let fN;
             const dCap = difficulty[0].toUpperCase() + difficulty.slice(1);
 
             if (mode === "normal") {
-              // Normal Mode: e.g., Easy_level_1.html
               fN = `${dCap}_level_${i}.html`;
             } else if (mode === "voice") {
-              // Voice Mode: e.g., Voice_Easy_level_1.html
               fN = `Voice_${dCap}_level_${i}.html`;
             } else {
-              fN = "#"; // Fallback
+              fN = "#"; 
             }
 
             btn.addEventListener("click", () => {
+              // Redirect to the game page. That page is responsible for calling updateLocalStat upon completion.
               window.location.href = fN;
             });
             levelButtonsContainer.appendChild(btn);
@@ -1091,92 +1065,62 @@
           switchView("level-select-view");
         };
 
-        // --- Leaderboard View Function (Updated) ---
-        const updateLeaderboardView = async (mode) => {
-          const uD = JSON.parse(localStorage.getItem("currentUser"));
-          if (!uD) return;
 
-          const leaderboardListElement =
-            mode === "normal"
-              ? document.getElementById("normal-leaderboard")
-              : document.getElementById("voice-leaderboard");
-          if (!leaderboardListElement) return;
+        // --- Profile/Stats Logic ---
 
-          leaderboardListElement.innerHTML =
-            '<li class="p-3 text-gray-500 text-center">Loading...</li>'; // Show loading state
-
-          const leaderboardData = await fetchLeaderboards(mode); // Fetch specific leaderboard
-          leaderboardListElement.innerHTML = ""; // Clear loading state
-
-          const createLeaderboardItem = (entry) => {
-            const li = document.createElement("li");
-            li.className =
-              "p-3 rounded-xl input-field flex justify-between items-center";
-            if (entry.username === uD.username) {
-              li.classList.add("user-highlight");
-            }
-            li.innerHTML = `<span class="font-bold text-lg w-1/6 text-left">${entry.rank}.</span><span class="font-semibold w-3/6 text-left">${entry.username}</span><span class="text-green-500 font-medium w-2/6 text-right">C: ${entry.completed}</span>`;
-            return li;
-          };
-
-          if (leaderboardData && leaderboardData.length > 0) {
-            leaderboardData.forEach((entry) => {
-              leaderboardListElement.appendChild(createLeaderboardItem(entry));
-            });
-          } else {
-            leaderboardListElement.innerHTML =
-              '<li class="p-3 text-gray-500 text-center">No scores yet.</li>';
-          }
-        };
-
-        // --- Profile Logic (FIXED: Uses server completed count for accurate remaining calculation) ---
-        const getStats = async () => {
-          const s = await fetchStatsFromServer();
-          let tL = 0, // Total possible levels (excluding training)
-            tC = 0, // Total completed levels (from server)
-            tD = 0; // Total dropped levels (from server)
+        const getLocalStats = () => {
+          // Ensure we use the latest stats from local storage
+          currentUserStats = JSON.parse(
+              localStorage.getItem("sudokuUserStats") || JSON.stringify(initialUserStats)
+          );
+          
+          let tL = 0; // Total possible levels (excluding training)
+          let tC = 0; // Total completed levels (from local stats)
+          let tD = 0; // Total dropped levels (from local stats)
 
           for (const mode of Object.keys(LEVEL_COUNTS)) {
-            // 1. Calculate Total Available Levels (tL) - Excluding training
+            // 1. Calculate Total Available Levels (tL) - Excluding training levels from the main total
             for (const diff of DIFFICULTY_KEYS_FOR_TOTALS) { 
               tL += LEVEL_COUNTS[mode][diff] || 0;
             }
             
-            // 2. Accumulate Completed (tC) and Dropped (tD) counts across ALL modes/difficulties (including training) from the server
+            // 2. Accumulate Completed (tC) and Dropped (tD) counts across ALL modes/difficulties (including training)
             for (const diff of Object.keys(LEVEL_COUNTS[mode])) { 
-              if (s[mode] && s[mode][diff]) {
-                tC += s[mode][diff].completed || 0; 
-                tD += s[mode][diff].dropped || 0;
+              if (currentUserStats[mode] && currentUserStats[mode][diff]) {
+                tC += currentUserStats[mode][diff].completed || 0; 
+                tD += currentUserStats[mode][diff].dropped || 0;
               }
             }
           }
           
-          // FIX: Remaining calculation is now accurate: Total Levels - (Completed from Server + Dropped from Server)
+          // Remaining calculation: Total Levels - (Completed + Dropped)
           const tR = Math.max(0, tL - tC - tD); 
           
           return {
-            stats: s,
-            totalLevels: tL,
+            stats: currentUserStats,
             totalCompleted: tC,
             totalDropped: tD,
             totalRemaining: tR
           };
         };
 
-        const updateProfileView = async () => {
+        const updateProfileView = () => {
           const uD = JSON.parse(localStorage.getItem("currentUser"));
           if (!uD) {
             switchView("login-view");
             return;
           }
+          
           const {
             stats: s,
             totalCompleted: tC,
             totalDropped: tD,
             totalRemaining: tR
-          } = await getStats();
+          } = getLocalStats();
+          
           const normalStatsList = document.getElementById("normal-stats-list");
           const voiceStatsList = document.getElementById("voice-stats-list");
+          
           document.getElementById("profile-username").textContent = uD.username;
           document.getElementById("profile-email").textContent = uD.email;
           document.getElementById("completed-levels").textContent = tC; 
@@ -1185,27 +1129,21 @@
           normalStatsList.innerHTML = "";
           voiceStatsList.innerHTML = "";
 
-          const createStatItem = (difficulty, count, mode) => {
-            // NOTE: We rely on the server's completed and dropped counts for consistency in the detailed stats lists too.
-            // compLocal is only used for checking the checkmark on the level select buttons.
-            
-            // Get completed count from server for stats display
-            const compServer = (s[mode]?.[difficulty]?.completed || 0);
-
-            // Get dropped count from server response
+          const createStatItem = (difficulty, totalCount, mode) => {
+            const comp = (s[mode]?.[difficulty]?.completed || 0);
             const drop = (s[mode]?.[difficulty]?.dropped || 0);
             
-            // FIX: Calculate remaining for the specific difficulty using server's completed/dropped counts.
-            const rem = Math.max(0, count - compServer - drop); 
+            // Calculate remaining for the specific difficulty
+            const rem = Math.max(0, totalCount - comp - drop); 
             
             const li = document.createElement("li");
             li.className =
               "p-3 rounded-xl input-field flex justify-between items-center";
             li.innerHTML = `<span class="font-semibold text-lg">${
               difficulty[0].toUpperCase() + difficulty.slice(1)
-            } (${count} ${
-              count > 1 ? "levels" : "level"
-            })</span><div class="text-sm space-x-4"><span class="text-green-500 font-medium">C: ${compServer}</span> <span class="text-yellow-500 font-medium">R: ${rem}</span> <span class="text-red-500 font-medium">D: ${drop}</span></div>`;
+            } (${totalCount} ${
+              totalCount > 1 ? "levels" : "level"
+            })</span><div class="text-sm space-x-4"><span class="text-green-500 font-medium">C: ${comp}</span> <span class="text-yellow-500 font-medium">R: ${rem}</span> <span class="text-red-500 font-medium">D: ${drop}</span></div>`;
             return li;
           };
 
@@ -1224,11 +1162,10 @@
 
           switchView("profile-view");
         };
-        // --- End Profile Logic ---
+        // --- End Profile/Stats Logic ---
 
 
-        // --- Event Listeners (Form/Button clicks) ---
-        // MODIFIED: Difficulty buttons now lead to showLevelSelect
+        // --- Event Listeners ---
         document
           .querySelectorAll(
             "#normal-difficulty-view [data-difficulty], #voice-difficulty-view [data-difficulty]"
@@ -1240,14 +1177,12 @@
               const mode = mV.id.includes("normal") ? "normal" : "voice";
 
               if (diff === "training") {
-                // Training mode links remain direct
                 if (mode === "normal") {
                   window.location.href = "Normal_training_mode.html";
                 } else {
                   window.location.href = "Training_voice.html";
                 }
               } else {
-                // Easy/Medium/Hard now go to the level select view
                 showLevelSelect(diff, mode);
               }
             });
@@ -1263,6 +1198,8 @@
                 : "voice-difficulty-view"
             );
           });
+          
+        // View switch links
         document
           .querySelector(".show-signup-link")
           .addEventListener("click", (e) => {
@@ -1281,29 +1218,28 @@
             switchView("login-view");
           })
         );
-
-        // --- Modified Mode Selection Listeners ---
-        document
-          .getElementById("select-normal-mode")
-          .addEventListener("click", (e) => {
-            e.preventDefault();
-            switchView("normal-difficulty-view");
-            updateLeaderboardView("normal"); // <-- Load leaderboard
-          });
-        document
-          .getElementById("select-voice-command")
-          .addEventListener("click", (e) => {
-            e.preventDefault();
-            switchView("voice-difficulty-view");
-            updateLeaderboardView("voice"); // <-- Load leaderboard
-          });
-
         document.querySelectorAll(".show-mode-select").forEach((l) =>
           l.addEventListener("click", (e) => {
             e.preventDefault();
             switchView("select-mode-view");
           })
         );
+
+        // Mode selection buttons
+        document
+          .getElementById("select-normal-mode")
+          .addEventListener("click", (e) => {
+            e.preventDefault();
+            switchView("normal-difficulty-view");
+          });
+        document
+          .getElementById("select-voice-command")
+          .addEventListener("click", (e) => {
+            e.preventDefault();
+            switchView("voice-difficulty-view");
+          });
+
+        // Form submissions
         document
           .getElementById("signup-form")
           .addEventListener("submit", (e) => {
@@ -1327,24 +1263,23 @@
           .getElementById("forgot-password-form")
           .addEventListener("submit", (e) => {
             e.preventDefault();
-            showMessage("Password reset link sent (simulation)!", "success");
+            forgotPassword(document.getElementById("forgot-email").value);
             document.getElementById("forgot-password-form").reset();
           });
 
+        // Profile and Logout
         profileButton.addEventListener("click", () => {
           updateProfileView();
         });
         document
           .getElementById("back-from-profile")
           .addEventListener("click", () => {
-            // Navigates back to the last non-profile view
             switchView(previousView);
           });
         document
           .getElementById("logout-button")
           .addEventListener("click", () => {
             localStorage.removeItem("currentUser");
-            localStorage.removeItem("completedLevels"); // Clear mock stats on logout
             sessionStorage.clear();
             switchView("login-view");
           });
@@ -1380,4 +1315,4 @@
       }); // End DOMContentLoaded
     </script>
   </body>
-</html>
+</html>+
